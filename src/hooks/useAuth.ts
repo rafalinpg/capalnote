@@ -8,6 +8,13 @@ export const useAuth = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [token, setToken] = useState<string | null>(localStorage.getItem('access_token'));
 
+  const logout = () => {
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+  };
+
   const fetchUser = async (authToken: string) => {
     try {
       const response = await fetch(`${API_URL}/me/`, {
@@ -70,13 +77,6 @@ export const useAuth = () => {
     } catch (error) {
       return { success: false, error: 'Erro de conexão com o servidor' };
     }
-  };
-
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
   };
 
   return { user, isLoading, login, logout, token };

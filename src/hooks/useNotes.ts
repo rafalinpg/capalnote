@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Note, Tag } from '../types';
+import { Note, Tag, Attachment } from '../types';
 import { useAuth } from './useAuth';
 
 const API_URL = `http://${window.location.hostname}:8000/api`;
@@ -8,6 +8,17 @@ interface TagBackend {
   id: number;
   name: string;
   color: string;
+}
+
+interface AttachmentBackend {
+  id: number;
+  note: number;
+  type: string;
+  file: string;
+  file_name: string;
+  size_bytes: number;
+  mime_type: string;
+  created_at: string;
 }
 
 interface NoteBackend {
@@ -22,6 +33,7 @@ interface NoteBackend {
   author: string;
   last_edited_by: string;
   tags: TagBackend[];
+  attachments: AttachmentBackend[];
   created_at: string;
   updated_at: string;
 }
@@ -30,6 +42,17 @@ const mapTagToFrontend = (data: TagBackend): Tag => ({
   id: String(data.id),
   name: data.name,
   color: data.color,
+});
+
+const mapAttachmentToFrontend = (data: AttachmentBackend): Attachment => ({
+  id: String(data.id),
+  noteId: String(data.note),
+  type: data.type as 'image' | 'audio' | 'file' | 'sketch',
+  fileUrl: data.file,
+  fileName: data.file_name,
+  sizeBytes: data.size_bytes,
+  mimeType: data.mime_type,
+  createdAt: new Date(data.created_at),
 });
 
 const mapToFrontend = (data: NoteBackend): Note => ({
@@ -44,7 +67,7 @@ const mapToFrontend = (data: NoteBackend): Note => ({
   authorId: data.author,
   lastEditedBy: data.last_edited_by,
   tags: data.tags.map(mapTagToFrontend),
-  attachments: [], // Backend doesn't return attachments in list yet
+  attachments: (data.attachments || []).map(mapAttachmentToFrontend),
   comments: [], // Backend doesn't return comments in list yet
   createdAt: new Date(data.created_at),
   updatedAt: new Date(data.updated_at),
@@ -83,41 +106,38 @@ export function useNotes() {
 
   const createNote = async (notebookId: string, title: string = 'Sem título', contentRich: string = '', contentText: string = '') => {
     if (!token) return;
-    try {
-      const response = await fetch(`${API_URL}/notes/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          notebook: parseInt(notebookId),
-          title,
-          content_rich: contentRich,
-          content_text: contentText,
-        }),
-      });
+    
+    const response = await fetch(`${API_URL}/notes/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        notebook: parseInt(notebookId),
+        title,
+        content_rich: contentRich,
+        content_text: contentText,
+      }),
+    });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Create note error response:', errorText);
-        throw new Error(`Falha ao criar nota: ${errorText}`);
-      }
-
-      const newNote: NoteBackend = await response.json();
-      const mapped = mapToFrontend(newNote);
-      setNotes(prev => [mapped, ...prev]);
-      return mapped;
-    } catch (err) {
-      throw err;
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Create note error response:', errorText);
+      throw new Error(`Falha ao criar nota: ${errorText}`);
     }
+
+    const newNote: NoteBackend = await response.json();
+    const mapped = mapToFrontend(newNote);
+    setNotes(prev => [mapped, ...prev]);
+    return mapped;
   };
 
   const updateNote = async (id: string, data: Partial<Note>) => {
     if (!token) return;
     
     // Map frontend camelCase to backend snake_case
-    const backendData: any = {};
+    const backendData: Record<string, unknown> = {};
     if (data.title !== undefined) backendData.title = data.title;
     if (data.contentRich !== undefined) backendData.content_rich = data.contentRich;
     if (data.contentText !== undefined) backendData.content_text = data.contentText;
@@ -127,27 +147,25 @@ export function useNotes() {
     if (data.notebookId !== undefined) backendData.notebook = parseInt(data.notebookId);
     if (data.tags !== undefined) backendData.tag_ids = data.tags.map(t => parseInt(t.id));
 
-    try {
-      const response = await fetch(`${API_URL}/notes/${id}/`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(backendData),
-      });
+    const response = await fetch(`${API_URL}/notes/${id}/`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(backendData),
+    });
 
-      if (!response.ok) {
-        throw new Error('Falha ao atualizar nota');
-      }
-
-      const updatedNote: NoteBackend = await response.json();
-      const mapped = mapToFrontend(updatedNote);
-      setNotes(prev => prev.map(n => n.id === id ? mapped : n));
-      return mapped;
-    } catch (err) {
-      throw err;
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Update note error response:', errorText);
+      throw new Error(`Falha ao atualizar nota: ${errorText}`);
     }
+
+    const updatedNote: NoteBackend = await response.json();
+    const mapped = mapToFrontend(updatedNote);
+    setNotes(prev => prev.map(n => n.id === id ? mapped : n));
+    return mapped;
   };
 
   const deleteNote = async (id: string) => {
@@ -157,26 +175,76 @@ export function useNotes() {
 
   const permanentDeleteNote = async (id: string) => {
     if (!token) return;
-    try {
-      const response = await fetch(`${API_URL}/notes/${id}/`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+    const response = await fetch(`${API_URL}/notes/${id}/`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
 
-      if (!response.ok) {
-        throw new Error('Falha ao excluir nota permanentemente');
-      }
-
-      setNotes(prev => prev.filter(n => n.id !== id));
-    } catch (err) {
-      throw err;
+    if (!response.ok) {
+      throw new Error('Falha ao excluir nota permanentemente');
     }
+
+    setNotes(prev => prev.filter(n => n.id !== id));
   };
 
   const restoreFromTrash = async (id: string) => {
     return updateNote(id, { isTrashed: false });
+  };
+
+  const uploadAttachment = async (noteId: string, file: File, type: 'image' | 'audio' | 'file' | 'sketch' = 'file') => {
+    if (!token) return;
+    const formData = new FormData();
+    formData.append('note', noteId);
+    formData.append('file', file);
+    formData.append('type', type);
+
+    const response = await fetch(`${API_URL}/attachments/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error('Falha ao enviar anexo');
+    }
+
+    const newAttachment: AttachmentBackend = await response.json();
+    const mapped = mapAttachmentToFrontend(newAttachment);
+    
+    setNotes(prev => prev.map(n => {
+      if (n.id === noteId) {
+        return {
+          ...n,
+          attachments: [...(n.attachments || []), mapped]
+        };
+      }
+      return n;
+    }));
+
+    return mapped;
+  };
+
+  const deleteAttachment = async (attachmentId: string) => {
+    if (!token) return;
+    const response = await fetch(`${API_URL}/attachments/${attachmentId}/`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Falha ao excluir anexo');
+    }
+
+    setNotes(prev => prev.map(n => ({
+      ...n,
+      attachments: (n.attachments || []).filter(a => a.id !== attachmentId)
+    })));
   };
 
   useEffect(() => {
@@ -192,6 +260,8 @@ export function useNotes() {
     deleteNote,
     permanentDeleteNote,
     restoreFromTrash,
+    uploadAttachment,
+    deleteAttachment,
     refresh: fetchNotes,
   };
 }

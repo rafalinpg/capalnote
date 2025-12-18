@@ -32,7 +32,7 @@ export default function Index({ user, onLogout }: IndexProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
   const { notebooks, createNotebook, updateNotebook, deleteNotebook } = useNotebooks();
-  const { notes, createNote, updateNote, deleteNote, permanentDeleteNote, restoreFromTrash } = useNotes();
+  const { notes, createNote, updateNote, deleteNote, permanentDeleteNote, restoreFromTrash, uploadAttachment, deleteAttachment } = useNotes();
   const { tags, createTag, updateTag, deleteTag } = useTags();
 
   // Apply dark theme by default
@@ -105,12 +105,14 @@ export default function Index({ user, onLogout }: IndexProps) {
   // Get section title
   const getSectionTitle = () => {
     switch (activeSection) {
-      case 'notebooks':
+      case 'notebooks': {
         const notebook = notebooks?.find((n) => n.id === selectedNotebookId);
         return notebook?.name || 'Todos os Cadernos';
-      case 'tags':
+      }
+      case 'tags': {
         const tag = tags.find((t) => t.id === selectedTagId);
         return tag?.name || 'Todas as Etiquetas';
+      }
       case 'pinned':
         return 'Notas Favoritas';
       case 'recent':
@@ -281,6 +283,8 @@ export default function Index({ user, onLogout }: IndexProps) {
                 onClose={() => setSelectedNoteId(undefined)}
                 onUpdate={handleUpdateNote}
                 onDelete={handleDeleteNote}
+                onUploadAttachment={(file, type) => uploadAttachment(selectedNote.id, file, type)}
+                onDeleteAttachment={deleteAttachment}
               />
             </motion.div>
           ) : (

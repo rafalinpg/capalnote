@@ -59,79 +59,70 @@ export function useNotebooks() {
 
   const createNotebook = async (name: string, description: string = '') => {
     if (!token) return;
-    try {
-      const response = await fetch(`${API_URL}/notebooks/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name, description }),
-      });
+    
+    const response = await fetch(`${API_URL}/notebooks/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name, description }),
+    });
 
-      if (!response.ok) {
-        throw new Error('Falha ao criar caderno');
-      }
-
-      const newNotebook: NotebookBackend = await response.json();
-      const mapped = mapToFrontend(newNotebook);
-      setNotebooks(prev => [mapped, ...prev]);
-      return mapped;
-    } catch (err) {
-      throw err;
+    if (!response.ok) {
+      throw new Error('Falha ao criar caderno');
     }
+
+    const newNotebook: NotebookBackend = await response.json();
+    const mapped = mapToFrontend(newNotebook);
+    setNotebooks(prev => [mapped, ...prev]);
+    return mapped;
   };
 
   const updateNotebook = async (id: string, data: Partial<Notebook>) => {
     if (!token) return;
     
     // Map frontend camelCase to backend snake_case
-    const backendData: any = {};
+    const backendData: Record<string, unknown> = {};
     if (data.name) backendData.name = data.name;
     if (data.description) backendData.description = data.description;
     if (data.isArchived !== undefined) backendData.is_archived = data.isArchived;
 
-    try {
-      const response = await fetch(`${API_URL}/notebooks/${id}/`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(backendData),
-      });
+    const response = await fetch(`${API_URL}/notebooks/${id}/`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(backendData),
+    });
 
-      if (!response.ok) {
-        throw new Error('Falha ao atualizar caderno');
-      }
-
-      const updatedNotebook: NotebookBackend = await response.json();
-      const mapped = mapToFrontend(updatedNotebook);
-      setNotebooks(prev => prev.map(nb => nb.id === id ? mapped : nb));
-      return mapped;
-    } catch (err) {
-      throw err;
+    if (!response.ok) {
+      throw new Error('Falha ao atualizar caderno');
     }
+
+    const updatedNotebook: NotebookBackend = await response.json();
+    const mapped = mapToFrontend(updatedNotebook);
+    setNotebooks(prev => prev.map(nb => nb.id === id ? mapped : nb));
+    return mapped;
   };
 
   const deleteNotebook = async (id: string) => {
     if (!token) return;
-    try {
-      const response = await fetch(`${API_URL}/notebooks/${id}/`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+    
+    const response = await fetch(`${API_URL}/notebooks/${id}/`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
-      if (!response.ok) {
-        throw new Error('Falha ao excluir caderno');
-      }
-
-      setNotebooks(prev => prev.filter(nb => nb.id !== id));
-    } catch (err) {
-      throw err;
+    if (!response.ok) {
+      throw new Error('Falha ao excluir caderno');
     }
+
+    setNotebooks(prev => prev.filter(nb => nb.id !== id));
   };
 
   useEffect(() => {

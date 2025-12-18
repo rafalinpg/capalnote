@@ -47,13 +47,13 @@ interface AppSidebarProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   notebooks: Notebook[];
-  onCreateNotebook: (name: string) => Promise<any>;
-  onUpdateNotebook: (id: string, data: Partial<Notebook>) => Promise<any>;
-  onDeleteNotebook: (id: string) => Promise<any>;
+  onCreateNotebook: (name: string) => Promise<Notebook>;
+  onUpdateNotebook: (id: string, data: Partial<Notebook>) => Promise<Notebook>;
+  onDeleteNotebook: (id: string) => Promise<void>;
   tags: Tag[];
-  onCreateTag: (name: string) => Promise<any>;
-  onUpdateTag: (id: string, data: Partial<Tag>) => Promise<any>;
-  onDeleteTag: (id: string) => Promise<any>;
+  onCreateTag: (name: string) => Promise<Tag>;
+  onUpdateTag: (id: string, data: Partial<Tag>) => Promise<Tag>;
+  onDeleteTag: (id: string) => Promise<void>;
 }
 
 export function AppSidebar({

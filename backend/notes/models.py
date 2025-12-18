@@ -50,10 +50,10 @@ class Attachment(models.Model):
     )
     note = models.ForeignKey(Note, on_delete=models.CASCADE, related_name="attachments")
     type = models.CharField(max_length=16, choices=TYPE_CHOICES)
-    file_url = models.URLField()
-    file_name = models.CharField(max_length=255)
-    size_bytes = models.IntegerField()
-    mime_type = models.CharField(max_length=128)
+    file = models.FileField(upload_to='attachments/', null=True)
+    file_name = models.CharField(max_length=255, blank=True)
+    size_bytes = models.IntegerField(blank=True, null=True)
+    mime_type = models.CharField(max_length=128, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
 
