@@ -19,9 +19,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { mockNotebooks, mockTags, currentUser } from '@/data/mockData';
+import { mockNotebooks, mockTags } from '@/data/mockData';
 import { useTheme } from '@/hooks/useTheme';
-
+import { User } from '@/types';
 type NavSection = 'notebooks' | 'tags' | 'pinned' | 'recent' | 'archived';
 
 interface AppSidebarProps {
@@ -33,6 +33,8 @@ interface AppSidebarProps {
   onTagSelect: (id: string) => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  user: User;
+  onLogout: () => void;
 }
 
 export function AppSidebar({
@@ -44,6 +46,8 @@ export function AppSidebar({
   onTagSelect,
   isCollapsed,
   onToggleCollapse,
+  user,
+  onLogout,
 }: AppSidebarProps) {
   const [notebooksExpanded, setNotebooksExpanded] = useState(true);
   const [tagsExpanded, setTagsExpanded] = useState(true);
@@ -86,8 +90,8 @@ export function AppSidebar({
               exit={{ opacity: 0, x: -10 }}
               className="flex-1 overflow-hidden"
             >
-              <h1 className="font-semibold text-foreground truncate">Notas</h1>
-              <p className="text-xs text-muted-foreground truncate">Corporativo</p>
+              <h1 className="font-semibold text-foreground truncate">CapalNote</h1>
+              <p className="text-xs text-muted-foreground truncate">Notas Corporativas</p>
             </motion.div>
           )}
         </AnimatePresence>
@@ -319,7 +323,7 @@ export function AppSidebar({
         <div className={cn('flex items-center gap-3 px-3 py-2', isCollapsed && 'justify-center')}>
           <Avatar className="w-8 h-8">
             <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
-              {currentUser.name
+              {user.name
                 .split(' ')
                 .map((n) => n[0])
                 .join('')}
@@ -327,12 +331,12 @@ export function AppSidebar({
           </Avatar>
           {!isCollapsed && (
             <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-medium truncate">{currentUser.name}</p>
-              <p className="text-xs text-muted-foreground truncate">{currentUser.email}</p>
+              <p className="text-sm font-medium truncate">{user.name}</p>
+              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
             </div>
           )}
           {!isCollapsed && (
-            <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground">
+            <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground" onClick={onLogout}>
               <LogOut className="w-4 h-4" />
             </Button>
           )}
