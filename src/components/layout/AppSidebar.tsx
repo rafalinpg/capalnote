@@ -33,7 +33,7 @@ interface AppSidebarProps {
   onTagSelect: (id: string) => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
-  user: User;
+  user: User | null;
   onLogout: () => void;
 }
 
@@ -323,13 +323,13 @@ export function AppSidebar({
         <div className={cn('flex items-center gap-3 px-3 py-2', isCollapsed && 'justify-center')}>
           <Avatar className="w-8 h-8">
             <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
-              {user.name
-                .split(' ')
+              {user?.name
+                ?.split(' ')
                 .map((n) => n[0])
-                .join('')}
+                .join('') || 'U'}
             </AvatarFallback>
           </Avatar>
-          {!isCollapsed && (
+          {!isCollapsed && user && (
             <div className="flex-1 overflow-hidden">
               <p className="text-sm font-medium truncate">{user.name}</p>
               <p className="text-xs text-muted-foreground truncate">{user.email}</p>
