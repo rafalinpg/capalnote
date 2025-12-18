@@ -26,6 +26,7 @@ export default function Index({ user, onLogout }: IndexProps) {
   const [selectedNoteId, setSelectedNoteId] = useState<string>();
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [notes, setNotes] = useState<Note[]>(mockNotes);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Apply dark theme by default
   useEffect(() => {
@@ -36,29 +37,48 @@ export default function Index({ user, onLogout }: IndexProps) {
     }
   }, []);
 
-  // Filter notes based on active section
+  // Filter notes based on active section and search query
   const filteredNotes = useMemo(() => {
+    let result: Note[];
+    
     switch (activeSection) {
       case 'notebooks':
-        return selectedNotebookId
+        result = selectedNotebookId
           ? notes.filter((n) => n.notebookId === selectedNotebookId && !n.isArchived)
           : notes.filter((n) => !n.isArchived);
+        break;
       case 'tags':
-        return selectedTagId
+        result = selectedTagId
           ? notes.filter((n) => n.tags.some((t) => t.id === selectedTagId) && !n.isArchived)
           : notes.filter((n) => !n.isArchived);
+        break;
       case 'pinned':
-        return notes.filter((n) => n.isPinned && !n.isArchived);
+        result = notes.filter((n) => n.isPinned && !n.isArchived);
+        break;
       case 'recent':
-        return [...notes]
+        result = [...notes]
           .filter((n) => !n.isArchived)
           .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+        break;
       case 'archived':
-        return notes.filter((n) => n.isArchived);
+        result = notes.filter((n) => n.isArchived);
+        break;
       default:
-        return notes.filter((n) => !n.isArchived);
+        result = notes.filter((n) => !n.isArchived);
     }
-  }, [activeSection, selectedNotebookId, selectedTagId, notes]);
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      result = result.filter((note) => 
+        note.title.toLowerCase().includes(query) ||
+        note.contentText.toLowerCase().includes(query) ||
+        note.tags.some((tag) => tag.name.toLowerCase().includes(query))
+      );
+    }
+
+    return result;
+  }, [activeSection, selectedNotebookId, selectedTagId, notes, searchQuery]);
 
   // Get section title
   const getSectionTitle = () => {
@@ -100,6 +120,8 @@ export default function Index({ user, onLogout }: IndexProps) {
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         user={user}
         onLogout={onLogout}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
       />
 
       {/* Main Content */}

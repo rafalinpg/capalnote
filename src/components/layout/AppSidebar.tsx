@@ -13,6 +13,7 @@ import {
   LogOut,
   Moon,
   Sun,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -35,6 +36,8 @@ interface AppSidebarProps {
   onToggleCollapse: () => void;
   user: User | null;
   onLogout: () => void;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
 }
 
 export function AppSidebar({
@@ -48,6 +51,8 @@ export function AppSidebar({
   onToggleCollapse,
   user,
   onLogout,
+  searchQuery,
+  onSearchChange,
 }: AppSidebarProps) {
   const [notebooksExpanded, setNotebooksExpanded] = useState(true);
   const [tagsExpanded, setTagsExpanded] = useState(true);
@@ -110,8 +115,18 @@ export function AppSidebar({
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar notas..."
-                className="pl-9 bg-surface-sunken border-transparent focus:border-primary/50"
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                className="pl-9 pr-9 bg-surface-sunken border-transparent focus:border-primary/50"
               />
+              {searchQuery && (
+                <button
+                  onClick={() => onSearchChange('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </motion.div>
         )}
