@@ -8,12 +8,17 @@ import { EmptyState } from '@/components/notes/EmptyState';
 import { ShareModal } from '@/components/modals/ShareModal';
 import { Button } from '@/components/ui/button';
 import { mockNotes, mockNotebooks, mockTags } from '@/data/mockData';
-import { Note } from '@/types';
+import { Note, User } from '@/types';
 import { cn } from '@/lib/utils';
 
 type NavSection = 'notebooks' | 'tags' | 'pinned' | 'recent' | 'archived';
 
-export default function Index() {
+interface IndexProps {
+  user: User;
+  onLogout: () => void;
+}
+
+export default function Index({ user, onLogout }: IndexProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeSection, setActiveSection] = useState<NavSection>('recent');
   const [selectedNotebookId, setSelectedNotebookId] = useState<string>();
@@ -93,6 +98,8 @@ export default function Index() {
         onTagSelect={setSelectedTagId}
         isCollapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+        user={user}
+        onLogout={onLogout}
       />
 
       {/* Main Content */}
