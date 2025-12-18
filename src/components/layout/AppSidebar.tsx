@@ -23,6 +23,9 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
 } from '@/components/ui/context-menu';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -454,6 +457,26 @@ export function AppSidebar({
                       >
                         Renomear
                       </ContextMenuItem>
+                      <ContextMenuSub>
+                        <ContextMenuSubTrigger>Mudar cor</ContextMenuSubTrigger>
+                        <ContextMenuSubContent className="w-48 p-2">
+                          <div className="grid grid-cols-5 gap-1">
+                            {[
+                              '#ef4444', '#f97316', '#f59e0b', '#84cc16', '#22c55e',
+                              '#06b6d4', '#3b82f6', '#6366f1', '#a855f7', '#d946ef',
+                              '#ec4899', '#f43f5e', '#71717a', '#3f3f46', '#000000'
+                            ].map((color) => (
+                              <button
+                                key={color}
+                                className="w-6 h-6 rounded-full border border-border hover:scale-110 transition-transform"
+                                style={{ backgroundColor: color }}
+                                onClick={() => onUpdateTag(tag.id, { color })}
+                                title={color}
+                              />
+                            ))}
+                          </div>
+                        </ContextMenuSubContent>
+                      </ContextMenuSub>
                       <ContextMenuItem
                         className="text-destructive focus:text-destructive"
                         onClick={() => {

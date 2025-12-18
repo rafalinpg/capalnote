@@ -273,6 +273,28 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
     }
   };
 
+  // Auto-save when tags change
+  useEffect(() => {
+    // We only want to save if selectedTags is different from note.tags to avoid initial render save
+    // But since selectedTags is initialized with note.tags, a simple dependency check is enough
+    // provided we debounce or check for actual changes.
+    // However, the toggleTag updates state, and we want to trigger save immediately or debounced.
+    // Let's use the existing debounce mechanism or trigger immediately.
+    // Given the user request "automatically save when including a tag", let's trigger the save.
+    
+    // Check if tags actually changed from initial note state or previous state?
+    // The handleSave function uses current selectedTags.
+    // We can just trigger the debounced save here.
+    
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      handleSaveRef.current();
+    }, 1000);
+
+  }, [selectedTags]);
+
   const addImage = () => {
     const input = document.createElement('input');
     input.type = 'file';
