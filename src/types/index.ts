@@ -52,8 +52,10 @@ export interface Note {
   contentText: string;
   isPinned: boolean;
   isArchived: boolean;
+  isTrashed: boolean;
   authorId: string;
   author?: User;
+  lastEditedBy?: string;
   tags: Tag[];
   attachments: Attachment[];
   comments: Comment[];

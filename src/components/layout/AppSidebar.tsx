@@ -14,16 +14,25 @@ import {
   Moon,
   Sun,
   X,
+  Trash2,
+  MoreHorizontal,
+  FileText,
 } from 'lucide-react';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { mockNotebooks, mockTags } from '@/data/mockData';
+import { mockTags } from '@/data/mockData';
 import { useTheme } from '@/hooks/useTheme';
-import { User } from '@/types';
-type NavSection = 'notebooks' | 'tags' | 'pinned' | 'recent' | 'archived';
+import { User, Notebook, Tag } from '@/types';
+type NavSection = 'notebooks' | 'tags' | 'pinned' | 'recent' | 'archived' | 'trash' | 'all_notes';
 
 interface AppSidebarProps {
   activeSection: NavSection;
@@ -32,12 +41,19 @@ interface AppSidebarProps {
   onNotebookSelect: (id: string) => void;
   selectedTagId?: string;
   onTagSelect: (id: string) => void;
-  isCollapsed: boolean;
-  onToggleCollapse: () => void;
   user: User | null;
   onLogout: () => void;
+  onOpenSearch: () => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  notebooks: Notebook[];
+  onCreateNotebook: (name: string) => Promise<any>;
+  onUpdateNotebook: (id: string, data: Partial<Notebook>) => Promise<any>;
+  onDeleteNotebook: (id: string) => Promise<any>;
+  tags: Tag[];
+  onCreateTag: (name: string) => Promise<any>;
+  onUpdateTag: (id: string, data: Partial<Tag>) => Promise<any>;
+  onDeleteTag: (id: string) => Promise<any>;
 }
 
 export function AppSidebar({
@@ -47,30 +63,47 @@ export function AppSidebar({
   onNotebookSelect,
   selectedTagId,
   onTagSelect,
-  isCollapsed,
-  onToggleCollapse,
   user,
   onLogout,
+  onOpenSearch,
   searchQuery,
   onSearchChange,
+  notebooks,
+  onCreateNotebook,
+  onUpdateNotebook,
+  onDeleteNotebook,
+  tags,
+  onCreateTag,
+  onUpdateTag,
+  onDeleteTag,
 }: AppSidebarProps) {
   const [notebooksExpanded, setNotebooksExpanded] = useState(true);
   const [tagsExpanded, setTagsExpanded] = useState(true);
+  const [moreExpanded, setMoreExpanded] = useState(true);
+  const [isCreatingNotebook, setIsCreatingNotebook] = useState(false);
+  const [newNotebookName, setNewNotebookName] = useState('');
+  const [editingNotebookId, setEditingNotebookId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [isCreatingTag, setIsCreatingTag] = useState(false);
+  const [newTagName, setNewTagName] = useState('');
+  const [editingTagId, setEditingTagId] = useState<string | null>(null);
+  const [editTagName, setEditTagName] = useState('');
   const { theme, toggleTheme } = useTheme();
 
-  const activeNotebooks = mockNotebooks.filter((n) => !n.isArchived);
-  const archivedNotebooks = mockNotebooks.filter((n) => n.isArchived);
+  const activeNotebooks = notebooks?.filter((n) => !n.isArchived) || [];
+  const archivedNotebooks = notebooks?.filter((n) => n.isArchived) || [];
 
   const navItems = [
     { id: 'pinned' as NavSection, icon: Pin, label: 'Favoritas' },
     { id: 'recent' as NavSection, icon: Clock, label: 'Recentes' },
     { id: 'archived' as NavSection, icon: Archive, label: 'Arquivadas' },
+    { id: 'all_notes' as NavSection, icon: FileText, label: 'Notas' },
   ];
 
   return (
     <motion.aside
       initial={false}
-      animate={{ width: isCollapsed ? 72 : 280 }}
+      animate={{ width: 280 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
       className={cn(
         'h-screen flex flex-col bg-sidebar border-r border-sidebar-border',
@@ -88,57 +121,42 @@ export function AppSidebar({
           <BookOpen className="w-5 h-5 text-primary-foreground" />
         </div>
         <AnimatePresence>
-          {!isCollapsed && (
-            <motion.div
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              className="flex-1 overflow-hidden"
-            >
-              <h1 className="font-semibold text-foreground truncate">CapalNote</h1>
-              <p className="text-xs text-muted-foreground truncate">Notas Corporativas</p>
-            </motion.div>
-          )}
+          <motion.div
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -10 }}
+            className="flex-1 overflow-hidden"
+          >
+            <h1 className="font-semibold text-foreground truncate">CapalNote</h1>
+            <p className="text-xs text-muted-foreground truncate">Notas Corporativas</p>
+          </motion.div>
         </AnimatePresence>
       </div>
 
       {/* Search */}
       <AnimatePresence>
-        {!isCollapsed && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="px-4 pb-4"
-          >
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar notas..."
-                value={searchQuery}
-                onChange={(e) => onSearchChange(e.target.value)}
-                className="pl-9 pr-9 bg-surface-sunken border-transparent focus:border-primary/50"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => onSearchChange('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          className="px-4 pb-4"
+        >
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <button
+              onClick={onOpenSearch}
+              className={cn(
+                "flex h-10 w-full rounded-md border border-transparent bg-surface-sunken px-3 py-2 pl-9 pr-9 text-sm ring-offset-background",
+                "text-muted-foreground text-left",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                "hover:text-foreground transition-colors"
               )}
-            </div>
-          </motion.div>
-        )}
+            >
+              Buscar notas...
+            </button>
+          </div>
+        </motion.div>
       </AnimatePresence>
-
-      {isCollapsed && (
-        <div className="px-4 pb-4 flex justify-center">
-          <Button variant="ghost" size="icon" className="text-muted-foreground">
-            <Search className="w-5 h-5" />
-          </Button>
-        </div>
-      )}
 
       <Separator className="bg-sidebar-border" />
 
@@ -160,16 +178,14 @@ export function AppSidebar({
             >
               <item.icon className="w-5 h-5 shrink-0" />
               <AnimatePresence>
-                {!isCollapsed && (
-                  <motion.span
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="truncate"
-                  >
-                    {item.label}
-                  </motion.span>
-                )}
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="truncate"
+                >
+                  {item.label}
+                </motion.span>
               </AnimatePresence>
             </Button>
           ))}
@@ -180,30 +196,36 @@ export function AppSidebar({
         {/* Notebooks */}
         <div className="px-2">
           <button
-            onClick={() => !isCollapsed && setNotebooksExpanded(!notebooksExpanded)}
+            onClick={() => setNotebooksExpanded(!notebooksExpanded)}
             className={cn(
               'w-full flex items-center gap-2 px-3 h-9 text-xs font-medium',
-              'text-muted-foreground hover:text-foreground transition-colors',
-              isCollapsed && 'justify-center'
+              'text-muted-foreground hover:text-foreground transition-colors'
             )}
           >
-            {!isCollapsed && (
-              <>
-                <ChevronRight
-                  className={cn(
-                    'w-4 h-4 transition-transform duration-200',
-                    notebooksExpanded && 'rotate-90'
-                  )}
-                />
-                <span className="flex-1 text-left">CADERNOS</span>
-                <Plus className="w-4 h-4 opacity-0 group-hover:opacity-100" />
-              </>
-            )}
-            {isCollapsed && <BookOpen className="w-5 h-5" />}
+            <>
+              <ChevronRight
+                className={cn(
+                  'w-4 h-4 transition-transform duration-200',
+                  notebooksExpanded && 'rotate-90'
+                )}
+              />
+              <span className="flex-1 text-left">CADERNOS</span>
+              <div
+                className="p-1 hover:bg-sidebar-accent rounded-md cursor-pointer transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsCreatingNotebook(true);
+                  setNotebooksExpanded(true);
+                }}
+                title="Criar novo caderno"
+              >
+                <Plus className="w-4 h-4 text-muted-foreground hover:text-primary" />
+              </div>
+            </>
           </button>
 
           <AnimatePresence>
-            {(notebooksExpanded || isCollapsed) && (
+            {notebooksExpanded && (
               <motion.div
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
@@ -211,34 +233,99 @@ export function AppSidebar({
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden"
               >
-                {activeNotebooks.map((notebook) => (
-                  <Button
-                    key={notebook.id}
-                    variant="ghost"
-                    onClick={() => {
-                      onSectionChange('notebooks');
-                      onNotebookSelect(notebook.id);
-                    }}
-                    className={cn(
-                      'w-full justify-start gap-3 h-9 px-3',
-                      !isCollapsed && 'pl-7',
-                      'text-sidebar-foreground hover:text-foreground hover:bg-sidebar-accent',
-                      selectedNotebookId === notebook.id &&
-                        activeSection === 'notebooks' &&
-                        'bg-sidebar-accent text-sidebar-accent-foreground'
-                    )}
-                  >
-                    <div
-                      className="w-2 h-2 rounded-full bg-primary shrink-0"
-                      style={{ opacity: 0.6 + Math.random() * 0.4 }}
+                {isCreatingNotebook && (
+                  <div className="px-3 py-1">
+                    <Input
+                      autoFocus
+                      value={newNotebookName}
+                      onChange={(e) => setNewNotebookName(e.target.value)}
+                      onKeyDown={async (e) => {
+                        if (e.key === 'Enter' && newNotebookName.trim()) {
+                          await onCreateNotebook(newNotebookName);
+                          setNewNotebookName('');
+                          setIsCreatingNotebook(false);
+                        } else if (e.key === 'Escape') {
+                          setIsCreatingNotebook(false);
+                          setNewNotebookName('');
+                        }
+                      }}
+                      onBlur={() => {
+                        if (!newNotebookName.trim()) {
+                          setIsCreatingNotebook(false);
+                        }
+                      }}
+                      placeholder="Nome do caderno..."
+                      className="h-8 text-xs"
                     />
-                    {!isCollapsed && (
-                      <span className="truncate flex-1 text-left">{notebook.name}</span>
-                    )}
-                    {!isCollapsed && (
-                      <span className="text-xs text-muted-foreground">{notebook.noteCount}</span>
-                    )}
-                  </Button>
+                  </div>
+                )}
+                {activeNotebooks.map((notebook) => (
+                  <ContextMenu key={notebook.id}>
+                    <ContextMenuTrigger>
+                      {editingNotebookId === notebook.id ? (
+                        <div className="px-3 py-1">
+                          <Input
+                            autoFocus
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            onKeyDown={async (e) => {
+                              if (e.key === 'Enter' && editName.trim()) {
+                                await onUpdateNotebook(notebook.id, { name: editName });
+                                setEditingNotebookId(null);
+                              } else if (e.key === 'Escape') {
+                                setEditingNotebookId(null);
+                              }
+                            }}
+                            onBlur={() => setEditingNotebookId(null)}
+                            className="h-8 text-xs"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            onSectionChange('notebooks');
+                            onNotebookSelect(notebook.id);
+                          }}
+                          className={cn(
+                            'w-full justify-start gap-3 h-9 px-3 pl-7',
+                            'text-sidebar-foreground hover:text-foreground hover:bg-sidebar-accent',
+                            selectedNotebookId === notebook.id &&
+                              activeSection === 'notebooks' &&
+                              'bg-sidebar-accent text-sidebar-accent-foreground'
+                          )}
+                        >
+                          <div
+                            className="w-2 h-2 rounded-full bg-primary shrink-0"
+                            style={{ opacity: 0.6 + Math.random() * 0.4 }}
+                          />
+                          <span className="truncate flex-1 text-left">{notebook.name}</span>
+                          <span className="text-xs text-muted-foreground">{notebook.noteCount}</span>
+                        </Button>
+                      )}
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      <ContextMenuItem
+                        onClick={() => {
+                          setEditName(notebook.name);
+                          setEditingNotebookId(notebook.id);
+                        }}
+                      >
+                        Renomear
+                      </ContextMenuItem>
+                      <ContextMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => {
+                          if (confirm('Tem certeza que deseja excluir este caderno?')) {
+                            onDeleteNotebook(notebook.id);
+                          }
+                        }}
+                      >
+                        Excluir
+                      </ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
                 ))}
               </motion.div>
             )}
@@ -250,29 +337,36 @@ export function AppSidebar({
         {/* Tags */}
         <div className="px-2">
           <button
-            onClick={() => !isCollapsed && setTagsExpanded(!tagsExpanded)}
+            onClick={() => setTagsExpanded(!tagsExpanded)}
             className={cn(
               'w-full flex items-center gap-2 px-3 h-9 text-xs font-medium',
-              'text-muted-foreground hover:text-foreground transition-colors',
-              isCollapsed && 'justify-center'
+              'text-muted-foreground hover:text-foreground transition-colors'
             )}
           >
-            {!isCollapsed && (
-              <>
-                <ChevronRight
-                  className={cn(
-                    'w-4 h-4 transition-transform duration-200',
-                    tagsExpanded && 'rotate-90'
-                  )}
-                />
-                <span className="flex-1 text-left">ETIQUETAS</span>
-              </>
-            )}
-            {isCollapsed && <Tags className="w-5 h-5" />}
+            <>
+              <ChevronRight
+                className={cn(
+                  'w-4 h-4 transition-transform duration-200',
+                  tagsExpanded && 'rotate-90'
+                )}
+              />
+              <span className="flex-1 text-left">ETIQUETAS</span>
+              <div
+                className="p-1 hover:bg-sidebar-accent rounded-md cursor-pointer transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsCreatingTag(true);
+                  setTagsExpanded(true);
+                }}
+                title="Criar nova etiqueta"
+              >
+                <Plus className="w-4 h-4 text-muted-foreground hover:text-primary" />
+              </div>
+            </>
           </button>
 
           <AnimatePresence>
-            {(tagsExpanded || isCollapsed) && (
+            {tagsExpanded && (
               <motion.div
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
@@ -280,30 +374,147 @@ export function AppSidebar({
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden"
               >
-                {mockTags.map((tag) => (
-                  <Button
-                    key={tag.id}
-                    variant="ghost"
-                    onClick={() => {
-                      onSectionChange('tags');
-                      onTagSelect(tag.id);
-                    }}
-                    className={cn(
-                      'w-full justify-start gap-3 h-9 px-3',
-                      !isCollapsed && 'pl-7',
-                      'text-sidebar-foreground hover:text-foreground hover:bg-sidebar-accent',
-                      selectedTagId === tag.id &&
-                        activeSection === 'tags' &&
-                        'bg-sidebar-accent text-sidebar-accent-foreground'
-                    )}
-                  >
-                    <div
-                      className="w-3 h-3 rounded-full shrink-0"
-                      style={{ backgroundColor: tag.color }}
+                {isCreatingTag && (
+                  <div className="px-3 py-1">
+                    <Input
+                      autoFocus
+                      value={newTagName}
+                      onChange={(e) => setNewTagName(e.target.value)}
+                      onKeyDown={async (e) => {
+                        if (e.key === 'Enter' && newTagName.trim()) {
+                          await onCreateTag(newTagName);
+                          setNewTagName('');
+                          setIsCreatingTag(false);
+                        } else if (e.key === 'Escape') {
+                          setIsCreatingTag(false);
+                          setNewTagName('');
+                        }
+                      }}
+                      onBlur={() => {
+                        if (!newTagName.trim()) {
+                          setIsCreatingTag(false);
+                        }
+                      }}
+                      placeholder="Nome da etiqueta..."
+                      className="h-8 text-xs"
                     />
-                    {!isCollapsed && <span className="truncate">{tag.name}</span>}
-                  </Button>
+                  </div>
+                )}
+                {tags.map((tag) => (
+                  <ContextMenu key={tag.id}>
+                    <ContextMenuTrigger>
+                      {editingTagId === tag.id ? (
+                        <div className="px-3 py-1">
+                          <Input
+                            autoFocus
+                            value={editTagName}
+                            onChange={(e) => setEditTagName(e.target.value)}
+                            onKeyDown={async (e) => {
+                              if (e.key === 'Enter' && editTagName.trim()) {
+                                await onUpdateTag(tag.id, { name: editTagName });
+                                setEditingTagId(null);
+                              } else if (e.key === 'Escape') {
+                                setEditingTagId(null);
+                              }
+                            }}
+                            onBlur={() => setEditingTagId(null)}
+                            className="h-8 text-xs"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            onSectionChange('tags');
+                            onTagSelect(tag.id);
+                          }}
+                          className={cn(
+                            'w-full justify-start gap-3 h-9 px-3 pl-7',
+                            'text-sidebar-foreground hover:text-foreground hover:bg-sidebar-accent',
+                            selectedTagId === tag.id &&
+                              activeSection === 'tags' &&
+                              'bg-sidebar-accent text-sidebar-accent-foreground'
+                          )}
+                        >
+                          <div
+                            className="w-3 h-3 rounded-full shrink-0"
+                            style={{ backgroundColor: tag.color }}
+                          />
+                          <span className="truncate">{tag.name}</span>
+                        </Button>
+                      )}
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      <ContextMenuItem
+                        onClick={() => {
+                          setEditTagName(tag.name);
+                          setEditingTagId(tag.id);
+                        }}
+                      >
+                        Renomear
+                      </ContextMenuItem>
+                      <ContextMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => {
+                          if (confirm('Tem certeza que deseja excluir esta etiqueta?')) {
+                            onDeleteTag(tag.id);
+                          }
+                        }}
+                      >
+                        Excluir
+                      </ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
                 ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <Separator className="my-2 bg-sidebar-border" />
+
+        {/* Mais */}
+        <div className="px-2">
+          <button
+            onClick={() => setMoreExpanded(!moreExpanded)}
+            className={cn(
+              'w-full flex items-center gap-2 px-3 h-9 text-xs font-medium',
+              'text-muted-foreground hover:text-foreground transition-colors'
+            )}
+          >
+            <>
+              <ChevronRight
+                className={cn(
+                  'w-4 h-4 transition-transform duration-200',
+                  moreExpanded && 'rotate-90'
+                )}
+              />
+              <span className="flex-1 text-left">MAIS</span>
+            </>
+          </button>
+
+          <AnimatePresence>
+            {moreExpanded && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <Button
+                  variant="ghost"
+                  onClick={() => onSectionChange('trash')}
+                  className={cn(
+                    'w-full justify-start gap-3 h-9 px-3 pl-7',
+                    'text-sidebar-foreground hover:text-foreground hover:bg-sidebar-accent',
+                    activeSection === 'trash' && 'bg-sidebar-accent text-sidebar-accent-foreground'
+                  )}
+                >
+                  <Trash2 className="w-4 h-4 shrink-0" />
+                  <span className="truncate">Lixeira</span>
+                </Button>
               </motion.div>
             )}
           </AnimatePresence>
@@ -322,7 +533,7 @@ export function AppSidebar({
           ) : (
             <Moon className="w-5 h-5 shrink-0" />
           )}
-          {!isCollapsed && <span>{theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}</span>}
+          <span>{theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}</span>
         </Button>
 
         <Button
@@ -330,12 +541,12 @@ export function AppSidebar({
           className="w-full justify-start gap-3 h-10 px-3 text-sidebar-foreground hover:text-foreground"
         >
           <Settings className="w-5 h-5 shrink-0" />
-          {!isCollapsed && <span>Configurações</span>}
+          <span>Configurações</span>
         </Button>
 
         <Separator className="bg-sidebar-border" />
 
-        <div className={cn('flex items-center gap-3 px-3 py-2', isCollapsed && 'justify-center')}>
+        <div className="flex items-center gap-3 px-3 py-2">
           <Avatar className="w-8 h-8">
             <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
               {user?.name
@@ -344,17 +555,15 @@ export function AppSidebar({
                 .join('') || 'U'}
             </AvatarFallback>
           </Avatar>
-          {!isCollapsed && user && (
+          {user && (
             <div className="flex-1 overflow-hidden">
               <p className="text-sm font-medium truncate">{user.name}</p>
               <p className="text-xs text-muted-foreground truncate">{user.email}</p>
             </div>
           )}
-          {!isCollapsed && (
-            <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground" onClick={onLogout}>
-              <LogOut className="w-4 h-4" />
-            </Button>
-          )}
+          <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground" onClick={onLogout}>
+            <LogOut className="w-4 h-4" />
+          </Button>
         </div>
       </div>
     </motion.aside>

@@ -1,21 +1,30 @@
 import { motion } from 'framer-motion';
-import { Pin, MoreHorizontal, Calendar, Tag as TagIcon } from 'lucide-react';
+import { Pin, MoreHorizontal, Calendar, Tag as TagIcon, Trash2, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Note } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface NoteListProps {
   notes: Note[];
   selectedNoteId?: string;
   onNoteSelect: (id: string) => void;
+  onDelete: (id: string) => void;
+  onRestore?: (id: string) => void;
   title: string;
   subtitle?: string;
+  isTrash?: boolean;
 }
 
-export function NoteList({ notes, selectedNoteId, onNoteSelect, title, subtitle }: NoteListProps) {
+export function NoteList({ notes, selectedNoteId, onNoteSelect, onDelete, onRestore, title, subtitle, isTrash }: NoteListProps) {
   const pinnedNotes = notes.filter((n) => n.isPinned);
   const regularNotes = notes.filter((n) => !n.isPinned);
 
@@ -77,17 +86,43 @@ export function NoteList({ notes, selectedNoteId, onNoteSelect, title, subtitle 
             )}
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-          onClick={(e) => {
-            e.stopPropagation();
-            // Handle more options
-          }}
-        >
-          <MoreHorizontal className="w-4 h-4" />
-        </Button>
+        {isTrash ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {onRestore && (
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRestore(note.id);
+                  }}
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Restaurar
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(note.id);
+                }}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Excluir Permanentemente
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
       </div>
     </motion.div>
   );

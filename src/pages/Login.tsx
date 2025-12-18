@@ -99,11 +99,11 @@ const Login = ({ onLogin }: LoginProps) => {
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email ou Usuário</Label>
                 <Input
                   id="email"
-                  type="email"
-                  placeholder="seu@email.com"
+                  type="text"
+                  placeholder="admin ou seu@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -141,18 +141,6 @@ const Login = ({ onLogin }: LoginProps) => {
                 {isLoading ? 'Entrando...' : 'Entrar'}
               </Button>
             </form>
-
-            <div className="mt-6 p-4 bg-muted/50 rounded-lg border border-border">
-              <p className="text-sm text-muted-foreground mb-2">
-                <strong>Usuário de teste:</strong>
-              </p>
-              <p className="text-sm font-mono text-foreground">
-                Email: teste@capal.com.br
-              </p>
-              <p className="text-sm font-mono text-foreground">
-                Senha: 123456
-              </p>
-            </div>
           </div>
         </motion.div>
       </div>

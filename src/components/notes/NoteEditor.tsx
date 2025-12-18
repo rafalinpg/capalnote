@@ -21,7 +21,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Note, Notebook } from '@/types';
+import { Note, Notebook, Tag as TagType } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -32,24 +32,45 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { mockNotebooks, mockTags } from '@/data/mockData';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface NoteEditorProps {
   note: Note;
+  notebooks: Notebook[];
+  tags: TagType[];
   onClose: () => void;
   onUpdate: (note: Note) => void;
+  onDelete: (noteId: string) => void;
 }
 
-export function NoteEditor({ note, onClose, onUpdate }: NoteEditorProps) {
+export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete }: NoteEditorProps) {
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.contentRich);
   const [isPinned, setIsPinned] = useState(note.isPinned);
   const [selectedTags, setSelectedTags] = useState(note.tags);
   const [showTagSelector, setShowTagSelector] = useState(false);
+  const [selectedNotebookId, setSelectedNotebookId] = useState(note.notebookId);
 
-  const notebook = mockNotebooks.find((n) => n.id === note.notebookId);
+  const notebook = notebooks.find((n) => n.id === selectedNotebookId);
+
+  const handleSave = () => {
+    onUpdate({
+      ...note,
+      title,
+      contentRich: content,
+      contentText: content, // For now using same content, ideally strip HTML for text
+      isPinned,
+      tags: selectedTags,
+      notebookId: selectedNotebookId,
+      updatedAt: new Date(),
+    });
+  };
+
+  const handleDelete = () => {
+    onDelete(note.id);
+    onClose();
+  };
 
   type ToolbarSeparator = { type: 'separator'; icon?: never; label?: never };
   type ToolbarButton = { type?: 'button'; icon: React.ComponentType<{ className?: string }>; label: string; shortcut?: string };
@@ -71,7 +92,7 @@ export function NoteEditor({ note, onClose, onUpdate }: NoteEditorProps) {
   ];
 
   const toggleTag = (tagId: string) => {
-    const tag = mockTags.find((t) => t.id === tagId);
+    const tag = tags.find((t) => t.id === tagId);
     if (!tag) return;
 
     if (selectedTags.find((t) => t.id === tagId)) {
@@ -100,7 +121,7 @@ export function NoteEditor({ note, onClose, onUpdate }: NoteEditorProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
-              {mockNotebooks
+              {notebooks
                 .filter((n) => !n.isArchived)
                 .map((n) => (
                   <DropdownMenuItem key={n.id}>
@@ -115,27 +136,11 @@ export function NoteEditor({ note, onClose, onUpdate }: NoteEditorProps) {
 
           <span className="text-sm text-muted-foreground">
             Editado {formatDistanceToNow(note.updatedAt, { addSuffix: true, locale: ptBR })}
+            {note.lastEditedBy && ` por ${note.lastEditedBy}`}
           </span>
         </div>
 
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsPinned(!isPinned)}
-            className={cn(isPinned && 'text-primary')}
-          >
-            <Pin className={cn('w-4 h-4', isPinned && 'fill-current')} />
-          </Button>
-
-          <Button variant="ghost" size="icon">
-            <History className="w-4 h-4" />
-          </Button>
-
-          <Button variant="ghost" size="icon">
-            <Share2 className="w-4 h-4" />
-          </Button>
-
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon">
@@ -143,7 +148,7 @@ export function NoteEditor({ note, onClose, onUpdate }: NoteEditorProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsPinned(!isPinned)}>
                 <Pin className="w-4 h-4 mr-2" />
                 {isPinned ? 'Desafixar' : 'Fixar'} nota
               </DropdownMenuItem>
@@ -156,7 +161,10 @@ export function NoteEditor({ note, onClose, onUpdate }: NoteEditorProps) {
                 Ver histórico
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">
+              <DropdownMenuItem 
+                className="text-destructive focus:text-destructive"
+                onClick={handleDelete}
+              >
                 <Trash2 className="w-4 h-4 mr-2" />
                 Excluir nota
               </DropdownMenuItem>
@@ -238,7 +246,7 @@ export function NoteEditor({ note, onClose, onUpdate }: NoteEditorProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
-                {mockTags.map((tag) => (
+                {tags.map((tag) => (
                   <DropdownMenuItem
                     key={tag.id}
                     onClick={() => toggleTag(tag.id)}
@@ -296,10 +304,10 @@ export function NoteEditor({ note, onClose, onUpdate }: NoteEditorProps) {
           <span>{note.contentText.split(' ').length} palavras</span>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="text-muted-foreground">
+          <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={onClose}>
             Descartar
           </Button>
-          <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
+          <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleSave}>
             Salvar
           </Button>
         </div>
