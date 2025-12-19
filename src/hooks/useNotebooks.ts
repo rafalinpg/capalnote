@@ -13,6 +13,7 @@ interface NotebookBackend {
   created_at: string;
   updated_at: string;
   note_count: number;
+  user_role?: 'owner' | 'full_access' | 'editor' | 'viewer';
 }
 
 const mapToFrontend = (data: NotebookBackend): Notebook => ({
@@ -22,6 +23,7 @@ const mapToFrontend = (data: NotebookBackend): Notebook => ({
   ownerId: data.owner, // Backend sends username
   isArchived: data.is_archived,
   noteCount: data.note_count,
+  userRole: data.user_role,
   createdAt: new Date(data.created_at),
   updatedAt: new Date(data.updated_at),
 });

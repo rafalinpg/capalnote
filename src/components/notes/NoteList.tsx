@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
-import { Pin, MoreHorizontal, Calendar, Tag as TagIcon, Trash2, RotateCcw } from 'lucide-react';
+import { Pin, MoreHorizontal, Calendar, Tag as TagIcon, Trash2, RotateCcw, Share2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Note } from '@/types';
+import { Note, AccessRole } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
@@ -22,11 +22,15 @@ interface NoteListProps {
   title: string;
   subtitle?: string;
   isTrash?: boolean;
+  onShare?: () => void;
+  userRole?: AccessRole;
 }
 
-export function NoteList({ notes, selectedNoteId, onNoteSelect, onDelete, onRestore, title, subtitle, isTrash }: NoteListProps) {
+export function NoteList({ notes, selectedNoteId, onNoteSelect, onDelete, onRestore, title, subtitle, isTrash, onShare, userRole }: NoteListProps) {
   const pinnedNotes = notes.filter((n) => n.isPinned);
   const regularNotes = notes.filter((n) => !n.isPinned);
+  
+  const canShare = userRole === 'owner' || userRole === 'full_access';
 
   const renderNoteCard = (note: Note, index: number) => (
     <motion.div
@@ -131,11 +135,26 @@ export function NoteList({ notes, selectedNoteId, onNoteSelect, onDelete, onRest
     <div className="h-full flex flex-col bg-background">
       {/* Header */}
       <div className="p-6 border-b border-border">
-        <h2 className="text-2xl font-semibold text-foreground">{title}</h2>
-        {subtitle && <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>}
-        <p className="text-sm text-muted-foreground mt-2">
-          {notes.length} {notes.length === 1 ? 'nota' : 'notas'}
-        </p>
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-2xl font-semibold text-foreground truncate">{title}</h2>
+            {subtitle && <p className="text-sm text-muted-foreground mt-1 truncate">{subtitle}</p>}
+            <p className="text-sm text-muted-foreground mt-2">
+              {notes.length} {notes.length === 1 ? 'nota' : 'notas'}
+            </p>
+          </div>
+          {onShare && canShare && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onShare}
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+              title="Compartilhar caderno"
+            >
+              <Share2 className="w-5 h-5" />
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Notes */}

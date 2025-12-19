@@ -1,11 +1,15 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, PanelLeftClose, PanelLeft } from 'lucide-react';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { NoteList } from '@/components/notes/NoteList';
 import { NoteEditor } from '@/components/notes/NoteEditor';
 import { EmptyState } from '@/components/notes/EmptyState';
+import { FileList } from '@/components/files/FileList';
+import { FilePreview } from '@/components/files/FilePreview';
 import { ShareModal } from '@/components/modals/ShareModal';
+import { SettingsModal } from '@/components/modals/SettingsModal';
 import { SearchCommand } from '@/components/search/SearchCommand';
 import { Button } from '@/components/ui/button';
 import { Note, User } from '@/types';
@@ -13,8 +17,9 @@ import { cn } from '@/lib/utils';
 import { useNotebooks } from '@/hooks/useNotebooks';
 import { useNotes } from '@/hooks/useNotes';
 import { useTags } from '@/hooks/useTags';
+import { useToast } from '@/hooks/use-toast';
 
-type NavSection = 'notebooks' | 'tags' | 'pinned' | 'recent' | 'archived' | 'trash' | 'all_notes';
+type NavSection = 'notebooks' | 'tags' | 'pinned' | 'recent' | 'archived' | 'trash' | 'all_notes' | 'files';
 
 interface IndexProps {
   user: User;
@@ -27,13 +32,61 @@ export default function Index({ user, onLogout }: IndexProps) {
   const [selectedNotebookId, setSelectedNotebookId] = useState<string>();
   const [selectedTagId, setSelectedTagId] = useState<string>();
   const [selectedNoteId, setSelectedNoteId] = useState<string>();
-  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [selectedFileId, setSelectedFileId] = useState<string>();
+  const [shareTarget, setShareTarget] = useState<{ type: 'note' | 'notebook', id: string, name: string } | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { toast } = useToast();
+  const inviteToken = searchParams.get('token');
 
   const { notebooks, createNotebook, updateNotebook, deleteNotebook } = useNotebooks();
-  const { notes, createNote, updateNote, deleteNote, permanentDeleteNote, restoreFromTrash, uploadAttachment, deleteAttachment } = useNotes();
+  const { notes, createNote, updateNote, deleteNote, permanentDeleteNote, restoreFromTrash, uploadAttachment, deleteAttachment, getHistory, restoreVersion } = useNotes();
   const { tags, createTag, updateTag, deleteTag } = useTags();
+
+  useEffect(() => {
+    const acceptInvite = async (token: string) => {
+        try {
+            const API_URL = `http://${window.location.hostname}:8000/api`;
+            const authToken = localStorage.getItem('access_token');
+            const response = await fetch(`${API_URL}/share/accept/`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ token }),
+            });
+            
+            if (response.ok) {
+                toast({
+                    title: "Convite aceito",
+                    description: "Você agora tem acesso ao item compartilhado.",
+                });
+                setSearchParams({}, { replace: true });
+                window.location.reload(); 
+            } else {
+                 toast({
+                    title: "Erro",
+                    description: "Não foi possível aceitar o convite ou ele já expirou.",
+                    variant: "destructive",
+                });
+            }
+        } catch (error) {
+             toast({
+                title: "Erro",
+                description: "Erro ao processar convite.",
+                variant: "destructive",
+            });
+        }
+    };
+
+    if (inviteToken) {
+        acceptInvite(inviteToken);
+    }
+  }, [inviteToken, toast, setSearchParams]);
 
   // Apply dark theme by default
   useEffect(() => {
@@ -116,13 +169,15 @@ export default function Index({ user, onLogout }: IndexProps) {
       case 'pinned':
         return 'Notas Favoritas';
       case 'recent':
-        return 'Notas Recentes';
+        return 'Todas as Notas';
       case 'archived':
         return 'Arquivadas';
       case 'trash':
         return 'Lixeira';
       case 'all_notes':
         return 'Todas as Notas';
+      case 'files':
+        return 'Arquivos';
       default:
         return 'Notas';
     }
@@ -130,11 +185,42 @@ export default function Index({ user, onLogout }: IndexProps) {
 
   const selectedNote = notes.find((n) => n.id === selectedNoteId);
 
-  const handleUpdateNote = async (updatedNote: Note) => {
+  const selectedFile = useMemo(() => {
+    if (!selectedFileId) return undefined;
+    for (const note of notes) {
+      const attachment = note.attachments?.find(a => a.id === selectedFileId);
+      if (attachment) {
+        return {
+          ...attachment,
+          noteTitle: note.title,
+          noteId: note.id
+        };
+      }
+    }
+    return undefined;
+  }, [selectedFileId, notes]);
+
+  const handleOpenNote = (noteId: string) => {
+     setSelectedNoteId(noteId);
+     // Find the note to determine its context
+     const note = notes.find(n => n.id === noteId);
+     if (note) {
+        if (note.isTrashed) {
+          setActiveSection('trash');
+        } else if (note.isArchived) {
+          setActiveSection('archived');
+        } else {
+          setActiveSection('recent');
+        }
+     }
+   };
+
+  const handleUpdateNote = async (updatedNote: Partial<Note> & { id: string }) => {
     try {
       await updateNote(updatedNote.id, updatedNote);
     } catch (error) {
       console.error('Failed to update note:', error);
+      throw error;
     }
   };
 
@@ -215,6 +301,7 @@ export default function Index({ user, onLogout }: IndexProps) {
         user={user}
         onLogout={onLogout}
         onOpenSearch={() => setIsSearchOpen(true)}
+        onOpenSettings={() => setIsSettingsModalOpen(true)}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         notebooks={notebooks}
@@ -233,7 +320,7 @@ export default function Index({ user, onLogout }: IndexProps) {
         <div
           className={cn(
             'border-r border-border transition-all duration-300',
-            selectedNote ? 'w-[360px]' : 'w-full max-w-2xl'
+            (selectedNote || activeSection === 'files') ? 'w-[360px]' : 'w-full max-w-2xl'
           )}
         >
           <div className="h-full flex flex-col">
@@ -249,26 +336,60 @@ export default function Index({ user, onLogout }: IndexProps) {
             </div>
 
             {/* Note List */}
-            <NoteList
-              notes={filteredNotes}
-              selectedNoteId={selectedNoteId}
-              onNoteSelect={setSelectedNoteId}
-              onDelete={handleDeleteNote}
-              onRestore={handleRestoreNote}
-              title={getSectionTitle()}
-              isTrash={activeSection === 'trash'}
-              subtitle={
-                activeSection === 'notebooks' && selectedNotebookId
-                  ? notebooks?.find((n) => n.id === selectedNotebookId)?.description
-                  : undefined
-              }
-            />
+            {activeSection === 'files' ? (
+              <FileList
+                notes={notes}
+                selectedFileId={selectedFileId}
+                onFileSelect={setSelectedFileId}
+              />
+            ) : (
+              <NoteList
+                notes={filteredNotes}
+                selectedNoteId={selectedNoteId}
+                onNoteSelect={setSelectedNoteId}
+                onDelete={handleDeleteNote}
+                onRestore={handleRestoreNote}
+                title={getSectionTitle()}
+                isTrash={activeSection === 'trash'}
+                subtitle={
+                  activeSection === 'notebooks' && selectedNotebookId
+                    ? notebooks?.find((n) => n.id === selectedNotebookId)?.description
+                    : undefined
+                }
+                onShare={activeSection === 'notebooks' && selectedNotebookId ? () => {
+                   const notebook = notebooks.find(n => n.id === selectedNotebookId);
+                   if (notebook) {
+                      setShareTarget({ type: 'notebook', id: notebook.id, name: notebook.name });
+                   }
+                } : undefined}
+                userRole={activeSection === 'notebooks' && selectedNotebookId ? notebooks.find(n => n.id === selectedNotebookId)?.userRole : undefined}
+              />
+            )}
           </div>
         </div>
 
         {/* Note Editor Panel */}
         <AnimatePresence mode="wait">
-          {selectedNote ? (
+          {activeSection === 'files' ? (
+             selectedFile ? (
+               <motion.div
+                 key={selectedFile.id}
+                 initial={{ opacity: 0 }}
+                 animate={{ opacity: 1 }}
+                 exit={{ opacity: 0 }}
+                 className="flex-1 min-w-0"
+               >
+                 <FilePreview 
+                   attachment={selectedFile}
+                   onOpenNote={handleOpenNote}
+                 />
+               </motion.div>
+             ) : (
+               <div className="flex-1 min-w-0 flex items-center justify-center text-muted-foreground">
+                 Selecione um arquivo para visualizar
+               </div>
+             )
+          ) : selectedNote ? (
             <motion.div
               key={selectedNote.id}
               initial={{ opacity: 0 }}
@@ -285,6 +406,9 @@ export default function Index({ user, onLogout }: IndexProps) {
                 onDelete={handleDeleteNote}
                 onUploadAttachment={(file, type) => uploadAttachment(selectedNote.id, file, type)}
                 onDeleteAttachment={deleteAttachment}
+                onShare={() => setShareTarget({ type: 'note', id: selectedNote.id, name: selectedNote.title })}
+                getHistory={getHistory}
+                restoreVersion={restoreVersion}
               />
             </motion.div>
           ) : (
@@ -297,12 +421,21 @@ export default function Index({ user, onLogout }: IndexProps) {
         </AnimatePresence>
       </div>
 
+      {/* Settings Modal */}
+      <SettingsModal
+        open={isSettingsModalOpen}
+        onOpenChange={setIsSettingsModalOpen}
+        user={user}
+        onUpdateUser={() => window.location.reload()}
+      />
+
       {/* Share Modal */}
       <ShareModal
-        open={shareModalOpen}
-        onOpenChange={setShareModalOpen}
-        itemType="note"
-        itemName={selectedNote?.title || ''}
+        open={!!shareTarget}
+        onOpenChange={(open) => !open && setShareTarget(null)}
+        itemType={shareTarget?.type || 'note'}
+        itemId={shareTarget?.id || ''}
+        itemName={shareTarget?.name || ''}
       />
 
       {/* Search Command */}

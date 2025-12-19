@@ -79,5 +79,36 @@ export const useAuth = () => {
     }
   };
 
-  return { user, isLoading, login, logout, token };
+  const register = async (name: string, email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const response = await fetch(`${API_URL}/register/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, email, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        localStorage.setItem('access_token', data.access);
+        localStorage.setItem('refresh_token', data.refresh);
+        setToken(data.access);
+        setUser({
+          id: data.user.id,
+          email: data.user.email,
+          name: data.user.name,
+          avatar: undefined,
+        });
+        return { success: true };
+      } else {
+        return { success: false, error: data.error || 'Falha no cadastro' };
+      }
+    } catch (error) {
+      return { success: false, error: 'Erro de conexão com o servidor' };
+    }
+  };
+
+  return { user, isLoading, login, register, logout, token };
 };

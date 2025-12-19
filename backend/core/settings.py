@@ -162,3 +162,16 @@ SIMPLE_JWT = {
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Email Configuration
+# Default to console backend for development (prints emails to terminal)
+# EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# Uncomment and configure these for real email sending (e.g., using Gmail)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'rafaelweckerlin@gmail.com'
+EMAIL_HOST_PASSWORD = 'acji pdsz eylh vjdw' # Use App Password, not login password
+DEFAULT_FROM_EMAIL = 'CapalNote <rafaelweckerlin@gmail.com>'

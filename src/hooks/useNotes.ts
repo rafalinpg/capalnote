@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Note, Tag, Attachment } from '../types';
+import { Note, Tag, Attachment, NoteVersion } from '../types';
 import { useAuth } from './useAuth';
 
 const API_URL = `http://${window.location.hostname}:8000/api`;
@@ -21,6 +21,17 @@ interface AttachmentBackend {
   created_at: string;
 }
 
+interface NoteVersionBackend {
+  id: number;
+  version_no: number;
+  title: string;
+  content_rich: string;
+  content_text: string;
+  created_at: string;
+  author: number;
+  author_name: string;
+}
+
 interface NoteBackend {
   id: number;
   notebook: number;
@@ -34,6 +45,7 @@ interface NoteBackend {
   last_edited_by: string;
   tags: TagBackend[];
   attachments: AttachmentBackend[];
+  user_role?: 'owner' | 'full_access' | 'editor' | 'viewer';
   created_at: string;
   updated_at: string;
 }
@@ -55,6 +67,17 @@ const mapAttachmentToFrontend = (data: AttachmentBackend): Attachment => ({
   createdAt: new Date(data.created_at),
 });
 
+const mapVersionToFrontend = (data: NoteVersionBackend, noteId: string): NoteVersion => ({
+  id: String(data.id),
+  noteId: noteId,
+  versionNo: data.version_no,
+  title: data.title,
+  contentRich: data.content_rich,
+  contentText: data.content_text,
+  createdAt: new Date(data.created_at),
+  authorId: String(data.author),
+});
+
 const mapToFrontend = (data: NoteBackend): Note => ({
   id: String(data.id),
   notebookId: String(data.notebook),
@@ -69,6 +92,7 @@ const mapToFrontend = (data: NoteBackend): Note => ({
   tags: data.tags.map(mapTagToFrontend),
   attachments: (data.attachments || []).map(mapAttachmentToFrontend),
   comments: [], // Backend doesn't return comments in list yet
+  userRole: data.user_role,
   createdAt: new Date(data.created_at),
   updatedAt: new Date(data.updated_at),
 });
@@ -136,16 +160,58 @@ export function useNotes() {
   const updateNote = async (id: string, data: Partial<Note>) => {
     if (!token) return;
     
-    // Map frontend camelCase to backend snake_case
+    // Find current note to compare changes
+    const currentNote = notes.find(n => n.id === id);
     const backendData: Record<string, unknown> = {};
-    if (data.title !== undefined) backendData.title = data.title;
-    if (data.contentRich !== undefined) backendData.content_rich = data.contentRich;
-    if (data.contentText !== undefined) backendData.content_text = data.contentText;
-    if (data.isPinned !== undefined) backendData.is_pinned = data.isPinned;
-    if (data.isArchived !== undefined) backendData.is_archived = data.isArchived;
-    if (data.isTrashed !== undefined) backendData.is_trashed = data.isTrashed;
-    if (data.notebookId !== undefined) backendData.notebook = parseInt(data.notebookId);
-    if (data.tags !== undefined) backendData.tag_ids = data.tags.map(t => parseInt(t.id));
+
+    // Only add fields that have actually changed or if currentNote is not found (fallback)
+    
+    if (data.title !== undefined && (!currentNote || data.title !== currentNote.title)) {
+      backendData.title = data.title;
+    }
+    
+    if (data.contentRich !== undefined && (!currentNote || data.contentRich !== currentNote.contentRich)) {
+      backendData.content_rich = data.contentRich;
+    }
+    
+    if (data.contentText !== undefined && (!currentNote || data.contentText !== currentNote.contentText)) {
+      backendData.content_text = data.contentText;
+    }
+    
+    if (data.isPinned !== undefined && (!currentNote || data.isPinned !== currentNote.isPinned)) {
+      backendData.is_pinned = data.isPinned;
+    }
+    
+    if (data.isArchived !== undefined && (!currentNote || data.isArchived !== currentNote.isArchived)) {
+      backendData.is_archived = data.isArchived;
+    }
+    
+    if (data.isTrashed !== undefined && (!currentNote || data.isTrashed !== currentNote.isTrashed)) {
+      backendData.is_trashed = data.isTrashed;
+    }
+    
+    if (data.notebookId !== undefined && (!currentNote || data.notebookId !== currentNote.notebookId)) {
+      backendData.notebook = parseInt(data.notebookId);
+    }
+    
+    // Check for tag changes
+    if (data.tags !== undefined) {
+      const currentTagIds = currentNote?.tags.map(t => t.id).sort().join(',') || '';
+      const newTagIds = data.tags.map(t => t.id).sort().join(',');
+      
+      if (!currentNote || currentTagIds !== newTagIds) {
+        backendData.tag_ids = data.tags
+          .map(t => parseInt(t.id))
+          .filter(id => !isNaN(id)); // Filter out any invalid IDs
+      }
+    }
+
+    // If nothing changed, don't send request
+    if (Object.keys(backendData).length === 0) {
+      return currentNote;
+    }
+
+    // console.log('Sending update to backend:', JSON.stringify(backendData, null, 2));
 
     const response = await fetch(`${API_URL}/notes/${id}/`, {
       method: 'PATCH',
@@ -158,8 +224,8 @@ export function useNotes() {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Update note error response:', errorText);
-      throw new Error(`Falha ao atualizar nota: ${errorText}`);
+      console.error('Update note error response:', response.status, errorText);
+      throw new Error(`Falha ao atualizar nota (${response.status}): ${errorText}`);
     }
 
     const updatedNote: NoteBackend = await response.json();
@@ -230,21 +296,66 @@ export function useNotes() {
 
   const deleteAttachment = async (attachmentId: string) => {
     if (!token) return;
-    const response = await fetch(`${API_URL}/attachments/${attachmentId}/`, {
-      method: 'DELETE',
+    try {
+      const response = await fetch(`${API_URL}/attachments/${attachmentId}/`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Falha ao excluir anexo');
+      }
+
+      setNotes(prev => prev.map(n => ({
+        ...n,
+        attachments: (n.attachments || []).filter(a => a.id !== attachmentId)
+      })));
+    } catch (error) {
+      console.error('Delete attachment error:', error);
+      throw error;
+    }
+  };
+
+  const getHistory = async (noteId: string): Promise<NoteVersion[]> => {
+    if (!token) return [];
+    
+    const response = await fetch(`${API_URL}/notes/${noteId}/history/`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
     });
 
     if (!response.ok) {
-      throw new Error('Falha ao excluir anexo');
+      throw new Error('Falha ao carregar histórico');
     }
 
-    setNotes(prev => prev.map(n => ({
-      ...n,
-      attachments: (n.attachments || []).filter(a => a.id !== attachmentId)
-    })));
+    const data: NoteVersionBackend[] = await response.json();
+    return data.map(v => mapVersionToFrontend(v, noteId));
+  };
+
+  const restoreVersion = async (noteId: string, versionId: string) => {
+    if (!token) return;
+
+    const response = await fetch(`${API_URL}/notes/${noteId}/restore_version/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ version_id: versionId }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Falha ao restaurar versão');
+    }
+
+    const updatedNote: NoteBackend = await response.json();
+    const mapped = mapToFrontend(updatedNote);
+    
+    setNotes(prev => prev.map(n => n.id === noteId ? mapped : n));
+    return mapped;
   };
 
   useEffect(() => {
@@ -262,6 +373,8 @@ export function useNotes() {
     restoreFromTrash,
     uploadAttachment,
     deleteAttachment,
+    getHistory,
+    restoreVersion,
     refresh: fetchNotes,
   };
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FileText, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,10 @@ const Login = ({ onLogin }: LoginProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
+  
+  const inviteToken = searchParams.get('token');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +33,12 @@ const Login = ({ onLogin }: LoginProps) => {
         title: 'Bem-vindo ao CapalNote!',
         description: 'Login realizado com sucesso.',
       });
-      navigate('/');
+      
+      if (inviteToken) {
+        navigate(`/?token=${inviteToken}`);
+      } else {
+        navigate('/');
+      }
     } else {
       toast({
         title: 'Erro no login',
@@ -99,11 +107,11 @@ const Login = ({ onLogin }: LoginProps) => {
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="email">Email ou Usuário</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
-                  type="text"
-                  placeholder="admin ou seu@email.com"
+                  type="email"
+                  placeholder="seu@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -141,6 +149,18 @@ const Login = ({ onLogin }: LoginProps) => {
                 {isLoading ? 'Entrando...' : 'Entrar'}
               </Button>
             </form>
+
+            <div className="mt-6 text-center text-sm">
+              <p className="text-muted-foreground">
+                Não tem uma conta?{' '}
+                <Link 
+                  to={inviteToken ? `/register?token=${inviteToken}` : '/register'} 
+                  className="text-primary hover:underline font-medium"
+                >
+                  Criar conta
+                </Link>
+              </p>
+            </div>
           </div>
         </motion.div>
       </div>

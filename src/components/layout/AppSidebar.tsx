@@ -1,22 +1,22 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  BookOpen,
-  Tags,
+  Notebook as NotebookIcon,
+  Tag as TagIcon,
   Pin,
   Clock,
-  Settings,
-  Search,
+  Trash2,
   Plus,
+  Search,
+  Settings,
+  MoreVertical,
+  ChevronDown,
   ChevronRight,
-  Archive,
   LogOut,
   Moon,
   Sun,
-  X,
-  Trash2,
-  MoreHorizontal,
   FileText,
+  StickyNote,
 } from 'lucide-react';
 import {
   ContextMenu,
@@ -35,7 +35,7 @@ import { Separator } from '@/components/ui/separator';
 import { mockTags } from '@/data/mockData';
 import { useTheme } from '@/hooks/useTheme';
 import { User, Notebook, Tag } from '@/types';
-type NavSection = 'notebooks' | 'tags' | 'pinned' | 'recent' | 'archived' | 'trash' | 'all_notes';
+type NavSection = 'notebooks' | 'tags' | 'pinned' | 'recent' | 'archived' | 'trash' | 'all_notes' | 'files';
 
 interface AppSidebarProps {
   activeSection: NavSection;
@@ -47,6 +47,7 @@ interface AppSidebarProps {
   user: User | null;
   onLogout: () => void;
   onOpenSearch: () => void;
+  onOpenSettings: () => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
   notebooks: Notebook[];
@@ -69,6 +70,7 @@ export function AppSidebar({
   user,
   onLogout,
   onOpenSearch,
+  onOpenSettings,
   searchQuery,
   onSearchChange,
   notebooks,
@@ -94,13 +96,11 @@ export function AppSidebar({
   const { theme, toggleTheme } = useTheme();
 
   const activeNotebooks = notebooks?.filter((n) => !n.isArchived) || [];
-  const archivedNotebooks = notebooks?.filter((n) => n.isArchived) || [];
 
   const navItems = [
     { id: 'pinned' as NavSection, icon: Pin, label: 'Favoritas' },
-    { id: 'recent' as NavSection, icon: Clock, label: 'Recentes' },
-    { id: 'archived' as NavSection, icon: Archive, label: 'Arquivadas' },
-    { id: 'all_notes' as NavSection, icon: FileText, label: 'Notas' },
+    { id: 'recent' as NavSection, icon: StickyNote, label: 'Notas' },
+    { id: 'files' as NavSection, icon: FileText, label: 'Arquivos' },
   ];
 
   return (
@@ -121,7 +121,7 @@ export function AppSidebar({
             'shadow-soft'
           )}
         >
-          <BookOpen className="w-5 h-5 text-primary-foreground" />
+          <NotebookIcon className="w-5 h-5 text-primary-foreground" />
         </div>
         <AnimatePresence>
           <motion.div
@@ -561,6 +561,7 @@ export function AppSidebar({
 
         <Button
           variant="ghost"
+          onClick={onOpenSettings}
           className="w-full justify-start gap-3 h-10 px-3 text-sidebar-foreground hover:text-foreground"
         >
           <Settings className="w-5 h-5 shrink-0" />

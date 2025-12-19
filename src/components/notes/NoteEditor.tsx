@@ -38,7 +38,7 @@ import {
 } from 'lucide-react';
 import { Extension } from '@tiptap/core';
 import { cn } from '@/lib/utils';
-import { Note, Notebook, Tag as TagType, Attachment } from '@/types';
+import { Note, Notebook, Tag as TagType, Attachment, NoteVersion } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -51,6 +51,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { HistoryDialog } from './HistoryDialog';
+
+import { useToast } from '@/hooks/use-toast';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -111,19 +114,30 @@ interface NoteEditorProps {
   notebooks: Notebook[];
   tags: TagType[];
   onClose: () => void;
-  onUpdate: (note: Note) => void;
+  onUpdate: (note: Partial<Note> & { id: string }) => Promise<void> | void;
   onDelete: (noteId: string) => void;
   onUploadAttachment: (file: File, type?: 'image' | 'audio' | 'file' | 'sketch') => Promise<Attachment>;
   onDeleteAttachment: (attachmentId: string) => Promise<void>;
+  onShare: () => void;
+  getHistory: (noteId: string) => Promise<NoteVersion[]>;
+  restoreVersion: (noteId: string, versionId: string) => Promise<any>;
 }
 
-export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete, onUploadAttachment, onDeleteAttachment }: NoteEditorProps) {
+export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete, onUploadAttachment, onDeleteAttachment, onShare, getHistory, restoreVersion }: NoteEditorProps) {
   const [title, setTitle] = useState(note.title);
   const [isPinned, setIsPinned] = useState(note.isPinned);
   const [selectedTags, setSelectedTags] = useState(note.tags);
   const [showTagSelector, setShowTagSelector] = useState(false);
   const [selectedNotebookId, setSelectedNotebookId] = useState(note.notebookId);
   const [localAttachments, setLocalAttachments] = useState<Attachment[]>(note.attachments || []);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const { toast } = useToast();
+
+  const role = note.userRole || 'viewer';
+
+  const canEdit = role === 'owner' || role === 'editor' || role === 'full_access';
+  const canShare = role === 'owner' || role === 'full_access';
+  const canDelete = role === 'owner';
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const handleSaveRef = useRef<() => void>(() => {});
@@ -131,6 +145,7 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
   const notebook = notebooks.find((n) => n.id === selectedNotebookId);
 
   const editor = useEditor({
+    editable: canEdit,
     extensions: [
       StarterKit,
       UnderlineExtension,
@@ -203,6 +218,8 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
     },
   });
 
+  const isFirstRender = useRef(true);
+
   // Sync editor content when note changes
   useEffect(() => {
     if (editor && note.id) {
@@ -215,30 +232,67 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note.id, editor]); // Removing note.contentRich to avoid loops, mostly for switching notes
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     if (!editor) return;
 
-    onUpdate({
-      ...note,
-      title,
-      contentRich: editor.getHTML(),
-      contentText: editor.getText(),
-      isPinned,
-      tags: selectedTags,
-      notebookId: selectedNotebookId,
-      attachments: localAttachments,
-      updatedAt: new Date(),
-    });
-  }, [editor, onUpdate, note, title, isPinned, selectedTags, selectedNotebookId, localAttachments]);
+    // Avoid saving if it is the first render
+    if (isFirstRender.current) return;
+
+    const newContentRich = editor.getHTML();
+    
+    // Check if there are actual changes
+    const hasChanges = 
+      title !== note.title ||
+      newContentRich !== note.contentRich ||
+      isPinned !== note.isPinned ||
+      selectedNotebookId !== note.notebookId ||
+      localAttachments.length !== (note.attachments || []).length ||
+      JSON.stringify(localAttachments.map(a => a.id).sort()) !== JSON.stringify((note.attachments || []).map(a => a.id).sort()) ||
+      JSON.stringify(selectedTags.map(t => t.id).sort()) !== JSON.stringify(note.tags.map(t => t.id).sort());
+
+    if (!hasChanges) return;
+
+    try {
+      await onUpdate({
+        ...note,
+        title,
+        contentRich: newContentRich,
+        contentText: editor.getText(),
+        isPinned,
+        tags: selectedTags,
+        notebookId: selectedNotebookId,
+        attachments: localAttachments,
+        updatedAt: new Date(),
+      });
+    } catch (error) {
+      console.error("Auto-save failed:", error);
+      toast({
+        title: "Erro ao salvar",
+        description: `Falha ao salvar as alterações automaticamente. ${error instanceof Error ? error.message : ''}`,
+        variant: "destructive",
+      });
+    }
+  }, [editor, onUpdate, note, title, isPinned, selectedTags, selectedNotebookId, localAttachments, toast]);
 
   useEffect(() => {
     handleSaveRef.current = handleSave;
   }, [handleSave]);
 
   useEffect(() => {
+    // Set isFirstRender to false after a short delay to allow initial content set
+    // This prevents the initial content set from triggering a save
+    const timeout = setTimeout(() => {
+      isFirstRender.current = false;
+    }, 1000);
+    return () => clearTimeout(timeout);
+  }, []);
+
+  useEffect(() => {
     if (!editor) return;
 
     const handleEditorUpdate = () => {
+      if (isFirstRender.current) return;
+      
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
@@ -256,6 +310,18 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
       }
     };
   }, [editor]);
+
+  // Auto-save when title changes
+  useEffect(() => {
+    if (isFirstRender.current) return;
+    
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      handleSaveRef.current();
+    }, 1000);
+  }, [title]);
 
   const handleDelete = () => {
     onDelete(note.id);
@@ -275,17 +341,8 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
 
   // Auto-save when tags change
   useEffect(() => {
-    // We only want to save if selectedTags is different from note.tags to avoid initial render save
-    // But since selectedTags is initialized with note.tags, a simple dependency check is enough
-    // provided we debounce or check for actual changes.
-    // However, the toggleTag updates state, and we want to trigger save immediately or debounced.
-    // Let's use the existing debounce mechanism or trigger immediately.
-    // Given the user request "automatically save when including a tag", let's trigger the save.
-    
-    // Check if tags actually changed from initial note state or previous state?
-    // The handleSave function uses current selectedTags.
-    // We can just trigger the debounced save here.
-    
+    if (isFirstRender.current) return;
+
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
@@ -294,6 +351,37 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
     }, 1000);
 
   }, [selectedTags]);
+
+  const togglePin = useCallback(() => {
+    const newPinned = !isPinned;
+    setIsPinned(newPinned);
+    
+    const newContentRich = editor?.getHTML() || '';
+    const hasContentChanges = 
+      title !== note.title ||
+      newContentRich !== note.contentRich;
+
+    if (hasContentChanges) {
+        // If there are content changes, send full update
+        onUpdate({
+            ...note,
+            title,
+            contentRich: newContentRich,
+            contentText: editor?.getText() || '',
+            isPinned: newPinned,
+            tags: selectedTags,
+            notebookId: selectedNotebookId,
+            attachments: localAttachments,
+            updatedAt: new Date(),
+        });
+    } else {
+        // If only pinning, send ONLY isPinned
+        onUpdate({
+            id: note.id,
+            isPinned: newPinned,
+        });
+    }
+  }, [isPinned, note, title, editor, onUpdate, selectedTags, selectedNotebookId, localAttachments]);
 
   const addImage = () => {
     const input = document.createElement('input');
@@ -359,8 +447,8 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
       <div className="flex items-center justify-between px-6 py-4 border-b border-border">
         <div className="flex items-center gap-3">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="gap-2 text-muted-foreground hover:text-foreground">
+            <DropdownMenuTrigger asChild disabled={!canEdit}>
+              <Button variant="ghost" className="gap-2 text-muted-foreground hover:text-foreground" disabled={!canEdit}>
                 <span className="w-2 h-2 rounded-full bg-primary" />
                 {notebook?.name || 'Sem caderno'}
                 <ChevronDown className="w-4 h-4" />
@@ -387,6 +475,16 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
         </div>
 
         <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={togglePin}
+            title={isPinned ? 'Desafixar nota' : 'Fixar nota'}
+            disabled={!canEdit}
+          >
+            <Pin className={cn("w-4 h-4", isPinned && "fill-primary text-primary")} />
+          </Button>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon">
@@ -394,26 +492,32 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setIsPinned(!isPinned)}>
+              <DropdownMenuItem onClick={togglePin} disabled={!canEdit}>
                 <Pin className="w-4 h-4 mr-2" />
                 {isPinned ? 'Desafixar' : 'Fixar'} nota
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Share2 className="w-4 h-4 mr-2" />
-                Compartilhar
-              </DropdownMenuItem>
+              {canShare && (
+                <DropdownMenuItem onClick={onShare}>
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Compartilhar
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem>
                 <History className="w-4 h-4 mr-2" />
                 Ver histórico
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                className="text-destructive focus:text-destructive"
-                onClick={handleDelete}
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Excluir nota
-              </DropdownMenuItem>
+              {canDelete && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    className="text-destructive focus:text-destructive"
+                    onClick={handleDelete}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Excluir nota
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -426,8 +530,9 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
       </div>
 
       {/* Toolbar */}
-      <div className="flex items-center gap-1 px-6 py-2 border-b border-border bg-muted/30 overflow-x-auto">
-        <Button
+      {canEdit && (
+        <div className="flex items-center gap-1 px-6 py-2 border-b border-border bg-muted/30 overflow-x-auto">
+          <Button
           variant={editor.isActive('bold') ? 'secondary' : 'ghost'}
           size="icon"
           className="w-8 h-8 shrink-0"
@@ -555,6 +660,7 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
           <Mic className="w-4 h-4 opacity-50" />
         </Button>
       </div>
+      )}
 
       {/* Editor Content */}
       <div className="flex-1 overflow-y-auto">
@@ -565,9 +671,11 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Título da nota"
+            disabled={!canEdit}
             className={cn(
               'w-full text-3xl font-semibold bg-transparent border-none outline-none',
-              'placeholder:text-muted-foreground/50 mb-6'
+              'placeholder:text-muted-foreground/50 mb-6',
+              !canEdit && 'cursor-not-allowed opacity-80'
             )}
           />
 
@@ -577,47 +685,52 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
               <Badge
                 key={tag.id}
                 variant="secondary"
-                className="gap-1.5 pr-1.5 cursor-pointer"
+                className={cn(
+                  "gap-1.5 pr-1.5",
+                  canEdit ? "cursor-pointer" : "cursor-default"
+                )}
                 style={{
                   backgroundColor: `${tag.color}15`,
                   color: tag.color,
                   borderColor: `${tag.color}30`,
                 }}
-                onClick={() => toggleTag(tag.id)}
+                onClick={() => canEdit && toggleTag(tag.id)}
               >
                 <span
                   className="w-2 h-2 rounded-full"
                   style={{ backgroundColor: tag.color }}
                 />
                 {tag.name}
-                <X className="w-3 h-3 ml-1 opacity-60 hover:opacity-100" />
+                {canEdit && <X className="w-3 h-3 ml-1 opacity-60 hover:opacity-100" />}
               </Badge>
             ))}
-            <DropdownMenu open={showTagSelector} onOpenChange={setShowTagSelector}>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-6 gap-1 text-muted-foreground">
-                  <Tag className="w-3.5 h-3.5" />
-                  Adicionar etiqueta
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {tags.map((tag) => (
-                  <DropdownMenuItem
-                    key={tag.id}
-                    onClick={() => toggleTag(tag.id)}
-                    className={cn(
-                      selectedTags.find((t) => t.id === tag.id) && 'bg-accent'
-                    )}
-                  >
-                    <span
-                      className="w-3 h-3 rounded-full mr-2"
-                      style={{ backgroundColor: tag.color }}
-                    />
-                    {tag.name}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {canEdit && (
+              <DropdownMenu open={showTagSelector} onOpenChange={setShowTagSelector}>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-6 gap-1 text-muted-foreground">
+                    <Tag className="w-3.5 h-3.5" />
+                    Adicionar etiqueta
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {tags.map((tag) => (
+                    <DropdownMenuItem
+                      key={tag.id}
+                      onClick={() => toggleTag(tag.id)}
+                      className={cn(
+                        selectedTags.find((t) => t.id === tag.id) && 'bg-accent'
+                      )}
+                    >
+                      <span
+                        className="w-3 h-3 rounded-full mr-2"
+                        style={{ backgroundColor: tag.color }}
+                      />
+                      {tag.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
 
           {/* Attachments List */}
@@ -644,14 +757,20 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
                      >
                         <Download className="w-3 h-3" />
                      </Button>
-                     <Button 
-                       variant="ghost" 
-                       size="icon" 
-                       className="h-6 w-6 text-destructive hover:text-destructive"
-                       onClick={() => removeAttachment(att.id)}
-                     >
-                        <X className="w-3 h-3" />
-                     </Button>
+                     {canEdit && (
+                       <Button 
+                         variant="ghost" 
+                         size="icon" 
+                         className="h-6 w-6 text-destructive hover:text-destructive"
+                         onClick={(e) => {
+                           e.preventDefault();
+                           e.stopPropagation();
+                           removeAttachment(att.id);
+                         }}
+                       >
+                          <X className="w-3 h-3" />
+                       </Button>
+                     )}
                   </div>
                 </div>
               ))}
@@ -673,6 +792,14 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
           <span>{editor.storage.characterCount?.words?.() || 0} palavras</span>
         </div>
       </div>
+      {/* Search Command */}
+      <HistoryDialog
+        open={isHistoryOpen}
+        onOpenChange={setIsHistoryOpen}
+        noteId={note.id}
+        getHistory={getHistory}
+        restoreVersion={restoreVersion}
+      />
     </motion.div>
   );
 }

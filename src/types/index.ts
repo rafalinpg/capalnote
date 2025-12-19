@@ -5,6 +5,8 @@ export interface User {
   avatar?: string;
 }
 
+export type AccessRole = 'owner' | 'full_access' | 'editor' | 'viewer';
+
 export interface Notebook {
   id: string;
   name: string;
@@ -12,6 +14,7 @@ export interface Notebook {
   ownerId: string;
   isArchived: boolean;
   noteCount: number;
+  userRole?: AccessRole;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -59,6 +62,7 @@ export interface Note {
   tags: Tag[];
   attachments: Attachment[];
   comments: Comment[];
+  userRole?: AccessRole;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -90,6 +94,6 @@ export interface NotebookMember {
   notebookId: string;
   userId: string;
   user?: User;
-  role: 'owner' | 'editor' | 'viewer';
+  role: AccessRole;
   addedAt: Date;
 }

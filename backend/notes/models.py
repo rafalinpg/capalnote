@@ -74,34 +74,57 @@ class NoteVersion(models.Model):
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
 
 
-class ShareLink(models.Model):
+class NoteMember(models.Model):
+    ROLE_CHOICES = (
+        ("full_access", "full_access"),
+        ("editor", "editor"),
+        ("viewer", "viewer"),
+    )
+    note = models.ForeignKey(Note, on_delete=models.CASCADE, related_name="members")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="note_memberships")
+    role = models.CharField(max_length=16, choices=ROLE_CHOICES)
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('note', 'user')
+
+
+class NotebookMember(models.Model):
+    ROLE_CHOICES = (
+        ("full_access", "full_access"),
+        ("editor", "editor"),
+        ("viewer", "viewer"),
+    )
+    notebook = models.ForeignKey(Notebook, on_delete=models.CASCADE, related_name="members")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notebook_memberships")
+    role = models.CharField(max_length=16, choices=ROLE_CHOICES)
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('notebook', 'user')
+
+
+class ShareInvitation(models.Model):
     TARGET_TYPE_CHOICES = (
         ("note", "note"),
         ("notebook", "notebook"),
     )
     ROLE_CHOICES = (
-        ("viewer", "viewer"),
+        ("full_access", "full_access"),
         ("editor", "editor"),
+        ("viewer", "viewer"),
     )
+    email = models.EmailField()
     target_type = models.CharField(max_length=16, choices=TARGET_TYPE_CHOICES)
-    note = models.ForeignKey(Note, null=True, blank=True, on_delete=models.CASCADE)
-    notebook = models.ForeignKey(Notebook, null=True, blank=True, on_delete=models.CASCADE)
+    target_id = models.IntegerField()  # ID of the note or notebook
     role = models.CharField(max_length=16, choices=ROLE_CHOICES)
     token = models.CharField(max_length=64, unique=True)
-    expires_at = models.DateTimeField(null=True, blank=True)
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    invited_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sent_invitations")
+    status = models.CharField(max_length=16, default='pending', choices=(('pending', 'pending'), ('accepted', 'accepted'), ('expired', 'expired')))
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return f"Invite {self.email} to {self.target_type} {self.target_id}"
 
-class NotebookMember(models.Model):
-    ROLE_CHOICES = (
-        ("owner", "owner"),
-        ("editor", "editor"),
-        ("viewer", "viewer"),
-    )
-    notebook = models.ForeignKey(Notebook, on_delete=models.CASCADE, related_name="members")
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    role = models.CharField(max_length=16, choices=ROLE_CHOICES)
-    added_at = models.DateTimeField(auto_now_add=True)
 
 # Create your models here.

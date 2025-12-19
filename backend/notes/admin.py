@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Notebook, Tag, Note, Attachment, Comment, NoteVersion, ShareLink, NotebookMember
+from .models import Notebook, Tag, Note, Attachment, Comment, NoteVersion, NotebookMember, NoteMember, ShareInvitation
 
 
 @admin.register(Notebook)
@@ -37,9 +37,14 @@ class NoteVersionAdmin(admin.ModelAdmin):
     list_display = ("id", "note", "version_no", "created_at", "author")
 
 
-@admin.register(ShareLink)
-class ShareLinkAdmin(admin.ModelAdmin):
-    list_display = ("id", "target_type", "note", "notebook", "role", "token", "expires_at", "created_by")
+@admin.register(NoteMember)
+class NoteMemberAdmin(admin.ModelAdmin):
+    list_display = ("id", "note", "user", "role", "added_at")
+
+
+@admin.register(ShareInvitation)
+class ShareInvitationAdmin(admin.ModelAdmin):
+    list_display = ("id", "email", "target_type", "target_id", "role", "token", "status", "created_at")
 
 
 @admin.register(NotebookMember)
