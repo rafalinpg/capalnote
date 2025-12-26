@@ -64,16 +64,6 @@ class Comment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
-class NoteVersion(models.Model):
-    note = models.ForeignKey(Note, on_delete=models.CASCADE, related_name="versions")
-    version_no = models.IntegerField()
-    title = models.CharField(max_length=255)
-    content_rich = models.TextField()
-    content_text = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
-
-
 class NoteMember(models.Model):
     ROLE_CHOICES = (
         ("full_access", "full_access"),

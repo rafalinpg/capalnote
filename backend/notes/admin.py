@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Notebook, Tag, Note, Attachment, Comment, NoteVersion, NotebookMember, NoteMember, ShareInvitation
+from .models import Notebook, Tag, Note, Attachment, Comment, NotebookMember, NoteMember, ShareInvitation
 
 
 @admin.register(Notebook)
@@ -30,11 +30,6 @@ class NoteAdmin(admin.ModelAdmin):
     search_fields = ("title", "content_text")
     list_filter = ("is_pinned", "is_archived", "notebook")
     inlines = [AttachmentInline, CommentInline]
-
-
-@admin.register(NoteVersion)
-class NoteVersionAdmin(admin.ModelAdmin):
-    list_display = ("id", "note", "version_no", "created_at", "author")
 
 
 @admin.register(NoteMember)

@@ -192,3 +192,52 @@
     animation: shimmer 2s infinite;
   }
 }
+
+@media print {
+  @page {
+    margin: 2cm;
+  }
+
+  body {
+    background: white;
+    color: black;
+  }
+
+  /* Hide everything using visibility to ensure structure is kept but invisible */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Show print container and its descendants */
+  #print-container,
+  #print-container * {
+    visibility: visible;
+  }
+
+  /* Position print container to take over the page */
+  #print-container {
+    display: block !important; /* Override inline display: none */
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: white;
+  }
+
+  /* Reset some styles for printing */
+  .prose {
+    max-width: none !important;
+  }
+  
+  /* Ensure images fit */
+  img {
+    max-width: 100% !important;
+  }
+
+  /* Hide scrollbars */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+}

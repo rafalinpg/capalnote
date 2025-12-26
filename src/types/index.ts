@@ -3,6 +3,7 @@ export interface User {
   name: string;
   email: string;
   avatar?: string;
+  isSuperuser?: boolean;
 }
 
 export type AccessRole = 'owner' | 'full_access' | 'editor' | 'viewer';
@@ -65,18 +66,6 @@ export interface Note {
   userRole?: AccessRole;
   createdAt: Date;
   updatedAt: Date;
-}
-
-export interface NoteVersion {
-  id: string;
-  noteId: string;
-  versionNo: number;
-  title: string;
-  contentRich: string;
-  contentText: string;
-  diffMeta?: Record<string, unknown>;
-  createdAt: Date;
-  authorId: string;
 }
 
 export interface ShareLink {

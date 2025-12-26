@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Notebook, Note, Tag, Attachment, NoteMember, NotebookMember, ShareInvitation, NoteVersion
+from .models import Notebook, Note, Tag, Attachment, NoteMember, NotebookMember, ShareInvitation
 
 class UserSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
@@ -71,7 +71,7 @@ class NoteSerializer(serializers.ModelSerializer):
             return None
         
         # Check ownership
-        if obj.author == user:
+        if obj.author == user or user.is_superuser:
             return 'owner'
             
         # Check direct membership
@@ -92,14 +92,6 @@ class NoteSerializer(serializers.ModelSerializer):
         except NotebookMember.DoesNotExist:
             return None
 
-class NoteVersionSerializer(serializers.ModelSerializer):
-    author_name = serializers.ReadOnlyField(source='author.username')
-    
-    class Meta:
-        model = NoteVersion
-        fields = ['id', 'version_no', 'title', 'content_rich', 'content_text', 'created_at', 'author', 'author_name']
-
-
 class NotebookSerializer(serializers.ModelSerializer):
     owner = serializers.ReadOnlyField(source='owner.username')
     note_count = serializers.SerializerMethodField()
@@ -117,7 +109,7 @@ class NotebookSerializer(serializers.ModelSerializer):
         if not user.is_authenticated:
             return None
             
-        if obj.owner == user:
+        if obj.owner == user or user.is_superuser:
             return 'owner'
             
         try:

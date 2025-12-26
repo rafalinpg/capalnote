@@ -23,10 +23,11 @@ interface NoteListProps {
   subtitle?: string;
   isTrash?: boolean;
   onShare?: () => void;
+  onEmptyTrash?: () => void;
   userRole?: AccessRole;
 }
 
-export function NoteList({ notes, selectedNoteId, onNoteSelect, onDelete, onRestore, title, subtitle, isTrash, onShare, userRole }: NoteListProps) {
+export function NoteList({ notes, selectedNoteId, onNoteSelect, onDelete, onRestore, title, subtitle, isTrash, onShare, onEmptyTrash, userRole }: NoteListProps) {
   const pinnedNotes = notes.filter((n) => n.isPinned);
   const regularNotes = notes.filter((n) => !n.isPinned);
   
@@ -153,6 +154,17 @@ export function NoteList({ notes, selectedNoteId, onNoteSelect, onDelete, onRest
             >
               <Share2 className="w-5 h-5" />
             </Button>
+          )}
+          {isTrash && onEmptyTrash && (
+             <Button
+               variant="destructive"
+               size="sm"
+               onClick={onEmptyTrash}
+               className="shrink-0 gap-2"
+             >
+               <Trash2 className="w-4 h-4" />
+               Esvaziar Lixeira
+             </Button>
           )}
         </div>
       </div>

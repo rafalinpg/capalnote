@@ -66,7 +66,8 @@ class RegisterView(APIView):
                     'id': user.id,
                     'username': user.username,
                     'email': user.email,
-                    'name': f"{user.first_name} {user.last_name}".strip()
+                    'name': f"{user.first_name} {user.last_name}".strip(),
+                    'is_superuser': user.is_superuser
                 }
             }, status=status.HTTP_201_CREATED)
         except Exception as e:
@@ -81,7 +82,8 @@ class UserDetail(APIView):
             "id": user.id,
             "username": user.username,
             "email": user.email,
-            "name": f"{user.first_name} {user.last_name}".strip() or user.username
+            "name": f"{user.first_name} {user.last_name}".strip() or user.username,
+            "is_superuser": user.is_superuser
         })
 
     def put(self, request):

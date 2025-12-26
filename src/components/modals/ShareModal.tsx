@@ -12,7 +12,8 @@ import {
   Send,
   Clock,
   Trash2,
-  ChevronDown
+  ChevronDown,
+  Plus
 } from 'lucide-react';
 import {
   Dialog,
@@ -32,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/components/ui/use-toast';
@@ -72,6 +74,7 @@ const API_URL = `http://${window.location.hostname}:8000/api`;
 export function ShareModal({ open, onOpenChange, itemType, itemId, itemName }: ShareModalProps) {
   const { token, user } = useAuth();
   const [email, setEmail] = useState('');
+  const [pendingEmails, setPendingEmails] = useState<string[]>([]);
   const [role, setRole] = useState<AccessRole>('viewer');
   const [loading, setLoading] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
@@ -101,47 +104,89 @@ export function ShareModal({ open, onOpenChange, itemType, itemId, itemName }: S
     if (open) {
       fetchMembers();
       setEmail('');
+      setPendingEmails([]);
       setRole('viewer');
     }
   }, [open, fetchMembers]);
 
+  const handleAddEmail = () => {
+    const trimmedEmail = email.trim();
+    if (trimmedEmail && !pendingEmails.includes(trimmedEmail)) {
+      if (trimmedEmail.includes('@')) {
+        setPendingEmails([...pendingEmails, trimmedEmail]);
+        setEmail('');
+      } else {
+        toast({
+          title: "Email inválido",
+          description: "Por favor, insira um endereço de email válido.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const handleRemovePendingEmail = (emailToRemove: string) => {
+    setPendingEmails(pendingEmails.filter(e => e !== emailToRemove));
+  };
+
   const handleInvite = async () => {
-    if (!email.trim()) return;
+    const emailsToSend = [...pendingEmails];
+    if (email.trim() && !pendingEmails.includes(email.trim())) {
+      if (email.includes('@')) {
+        emailsToSend.push(email.trim());
+      }
+    }
+
+    if (emailsToSend.length === 0) return;
 
     setLoading(true);
-    try {
-      const response = await fetch(`${API_URL}/share/invite/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          target_type: itemType,
-          target_id: itemId,
-          role,
-        }),
-      });
+    let successCount = 0;
+    let failCount = 0;
 
-      if (!response.ok) {
-        throw new Error('Falha ao enviar convite');
+    for (const emailToSend of emailsToSend) {
+      try {
+        const response = await fetch(`${API_URL}/share/invite/`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: emailToSend,
+            target_type: itemType,
+            target_id: itemId,
+            role,
+          }),
+        });
+
+        if (response.ok) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+      } catch (error) {
+        failCount++;
       }
+    }
 
+    setLoading(false);
+
+    if (successCount > 0) {
       toast({
-        title: "Convite enviado",
-        description: `Um email foi enviado para ${email}`,
+        title: "Convites enviados",
+        description: `${successCount} convite(s) enviado(s) com sucesso.`,
       });
       setEmail('');
+      setPendingEmails([]);
       fetchMembers();
-    } catch (error) {
+    }
+
+    if (failCount > 0) {
       toast({
         title: "Erro",
-        description: "Não foi possível enviar o convite.",
+        description: `Falha ao enviar ${failCount} convite(s).`,
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -319,12 +364,38 @@ export function ShareModal({ open, onOpenChange, itemType, itemId, itemName }: S
           <div className="space-y-4">
             <div className="flex gap-2">
               <Input
-                placeholder="Adicionar nome ou e-mail"
+                placeholder="Adicionar email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddEmail();
+                  }
+                }}
                 className="flex-1"
               />
+              <Button variant="outline" size="icon" onClick={handleAddEmail} disabled={!email.trim()}>
+                <Plus className="w-4 h-4" />
+              </Button>
             </div>
+
+            {pendingEmails.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {pendingEmails.map((e) => (
+                  <Badge key={e} variant="secondary" className="gap-1 pr-1">
+                    {e}
+                    <button
+                      onClick={() => handleRemovePendingEmail(e)}
+                      className="ml-1 rounded-full p-0.5 hover:bg-muted-foreground/20 focus:outline-none"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+
             <div className="flex justify-between items-center gap-2 flex-wrap sm:flex-nowrap">
                 <Select value={role} onValueChange={(v) => setRole(v as AccessRole)}>
                   <SelectTrigger className="w-full sm:w-[180px]">
@@ -352,8 +423,8 @@ export function ShareModal({ open, onOpenChange, itemType, itemId, itemName }: S
                   </SelectContent>
                 </Select>
 
-                <Button onClick={handleInvite} disabled={loading || !email} className="w-full sm:w-auto">
-                  {loading ? 'Enviando...' : 'Enviar convite'}
+                <Button onClick={handleInvite} disabled={loading || (pendingEmails.length === 0 && !email.trim())} className="w-full sm:w-auto">
+                  {loading ? 'Enviando...' : `Enviar convite${(pendingEmails.length + (email.trim() ? 1 : 0)) > 1 ? ` (${pendingEmails.length + (email.trim() ? 1 : 0)})` : ''}`}
                 </Button>
             </div>
           </div>

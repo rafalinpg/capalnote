@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Note, Tag, Attachment, NoteVersion } from '../types';
+import { Note, Tag, Attachment } from '../types';
 import { useAuth } from './useAuth';
 
 const API_URL = `http://${window.location.hostname}:8000/api`;
@@ -19,17 +19,6 @@ interface AttachmentBackend {
   size_bytes: number;
   mime_type: string;
   created_at: string;
-}
-
-interface NoteVersionBackend {
-  id: number;
-  version_no: number;
-  title: string;
-  content_rich: string;
-  content_text: string;
-  created_at: string;
-  author: number;
-  author_name: string;
 }
 
 interface NoteBackend {
@@ -65,17 +54,6 @@ const mapAttachmentToFrontend = (data: AttachmentBackend): Attachment => ({
   sizeBytes: data.size_bytes,
   mimeType: data.mime_type,
   createdAt: new Date(data.created_at),
-});
-
-const mapVersionToFrontend = (data: NoteVersionBackend, noteId: string): NoteVersion => ({
-  id: String(data.id),
-  noteId: noteId,
-  versionNo: data.version_no,
-  title: data.title,
-  contentRich: data.content_rich,
-  contentText: data.content_text,
-  createdAt: new Date(data.created_at),
-  authorId: String(data.author),
 });
 
 const mapToFrontend = (data: NoteBackend): Note => ({
@@ -259,6 +237,23 @@ export function useNotes() {
     return updateNote(id, { isTrashed: false });
   };
 
+  const emptyTrash = async () => {
+    if (!token) return;
+    const response = await fetch(`${API_URL}/notes/empty_trash/`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Falha ao esvaziar lixeira');
+    }
+    
+    // Refresh notes locally
+    setNotes(prev => prev.filter(n => !n.isTrashed));
+  };
+
   const uploadAttachment = async (noteId: string, file: File, type: 'image' | 'audio' | 'file' | 'sketch' = 'file') => {
     if (!token) return;
     const formData = new FormData();
@@ -318,46 +313,6 @@ export function useNotes() {
     }
   };
 
-  const getHistory = async (noteId: string): Promise<NoteVersion[]> => {
-    if (!token) return [];
-    
-    const response = await fetch(`${API_URL}/notes/${noteId}/history/`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Falha ao carregar histórico');
-    }
-
-    const data: NoteVersionBackend[] = await response.json();
-    return data.map(v => mapVersionToFrontend(v, noteId));
-  };
-
-  const restoreVersion = async (noteId: string, versionId: string) => {
-    if (!token) return;
-
-    const response = await fetch(`${API_URL}/notes/${noteId}/restore_version/`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ version_id: versionId }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Falha ao restaurar versão');
-    }
-
-    const updatedNote: NoteBackend = await response.json();
-    const mapped = mapToFrontend(updatedNote);
-    
-    setNotes(prev => prev.map(n => n.id === noteId ? mapped : n));
-    return mapped;
-  };
-
   useEffect(() => {
     fetchNotes();
   }, [fetchNotes]);
@@ -371,10 +326,9 @@ export function useNotes() {
     deleteNote,
     permanentDeleteNote,
     restoreFromTrash,
+    emptyTrash,
     uploadAttachment,
     deleteAttachment,
-    getHistory,
-    restoreVersion,
-    refresh: fetchNotes,
+    refreshNotes: fetchNotes,
   };
 }

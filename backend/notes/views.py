@@ -8,8 +8,11 @@ from django.shortcuts import get_object_or_404
 from django.utils.crypto import get_random_string
 from django.core.mail import send_mail
 from django.conf import settings
-from .models import Notebook, Note, Tag, Attachment, ShareInvitation, NotebookMember, NoteMember, NoteVersion
-from .serializers import NotebookSerializer, NoteSerializer, TagSerializer, AttachmentSerializer, ShareInvitationSerializer, NoteMemberSerializer, NotebookMemberSerializer, NoteVersionSerializer
+from .models import Notebook, Note, Tag, Attachment, NoteMember, NotebookMember, ShareInvitation
+from .serializers import (
+    NotebookSerializer, NoteSerializer, TagSerializer, AttachmentSerializer, 
+    NoteMemberSerializer, NotebookMemberSerializer, ShareInvitationSerializer
+)
 
 class TagViewSet(viewsets.ModelViewSet):
     queryset = Tag.objects.all()
@@ -18,6 +21,8 @@ class TagViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         # Return only tags owned by the current user
+        if self.request.user.is_superuser:
+            return self.queryset.order_by('name')
         return self.queryset.filter(owner=self.request.user).order_by('name')
 
     def perform_create(self, serializer):
@@ -30,6 +35,8 @@ class NotebookViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        if user.is_superuser:
+            return self.queryset.order_by('-created_at')
         return self.queryset.filter(
             Q(owner=user) | Q(members__user=user)
         ).distinct().order_by('-created_at')
@@ -42,7 +49,7 @@ class NotebookViewSet(viewsets.ModelViewSet):
         notebook = serializer.instance
         user = self.request.user
         
-        if notebook.owner == user:
+        if notebook.owner == user or user.is_superuser:
             serializer.save()
             return
             
@@ -55,7 +62,7 @@ class NotebookViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         # Only owner can delete notebook
-        if instance.owner != self.request.user:
+        if instance.owner != self.request.user and not self.request.user.is_superuser:
             raise PermissionDenied("Only the owner can delete this notebook.")
         instance.delete()
 
@@ -66,6 +73,8 @@ class NoteViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        if user.is_superuser:
+            return self.queryset.order_by('-updated_at')
         return self.queryset.filter(
             Q(author=user) | 
             Q(members__user=user) | 
@@ -79,7 +88,7 @@ class NoteViewSet(viewsets.ModelViewSet):
         user = self.request.user
         
         can_create = False
-        if notebook.owner == user:
+        if notebook.owner == user or user.is_superuser:
             can_create = True
         else:
             member = notebook.members.filter(user=user).first()
@@ -90,6 +99,16 @@ class NoteViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("You do not have permission to add notes to this notebook.")
             
         serializer.save(author=self.request.user, last_edited_by=self.request.user)
+
+    @action(detail=False, methods=['delete'])
+    def empty_trash(self, request):
+        if not request.user.is_superuser:
+            raise PermissionDenied("Only superusers can empty the trash.")
+        
+        # Delete all trashed notes
+        count, _ = Note.objects.filter(is_trashed=True).delete()
+        
+        return Response({'status': 'success', 'deleted_count': count})
 
     def perform_update(self, serializer):
         note = serializer.instance
@@ -124,107 +143,13 @@ class NoteViewSet(viewsets.ModelViewSet):
             serializer.instance.is_pinned = serializer.validated_data['is_pinned']
         else:
             note = serializer.save(last_edited_by=self.request.user)
-            
-            # Create new version if content changed
-            if 'title' in serializer.validated_data or 'content_rich' in serializer.validated_data:
-                last_version = note.versions.order_by('-version_no').first()
-                next_version = (last_version.version_no + 1) if last_version else 1
-                
-                NoteVersion.objects.create(
-                    note=note,
-                    version_no=next_version,
-                    title=note.title,
-                    content_rich=note.content_rich,
-                    content_text=note.content_text,
-                    author=self.request.user
-                )
 
-    @action(detail=True, methods=['get'])
-    def history(self, request, pk=None):
-        note = self.get_object()
-        
-        # Check permissions (full_access only)
-        user = request.user
-        has_access = False
-        
-        if note.author == user or note.notebook.owner == user:
-            has_access = True
-        else:
-            member = note.members.filter(user=user).first()
-            if member and member.role == 'full_access':
-                has_access = True
-            else:
-                nb_member = note.notebook.members.filter(user=user).first()
-                if nb_member and nb_member.role == 'full_access':
-                    has_access = True
-                    
-        if not has_access:
-            return Response({'error': 'Permission denied. Only users with full access can view history.'}, status=403)
-            
-        versions = note.versions.all().order_by('-version_no')
-        serializer = NoteVersionSerializer(versions, many=True)
-        return Response(serializer.data)
-
-    @action(detail=True, methods=['post'])
-    def restore_version(self, request, pk=None):
-        note = self.get_object()
-        version_id = request.data.get('version_id')
-        
-        # Check permissions (full_access only)
-        user = request.user
-        has_access = False
-        
-        if note.author == user or note.notebook.owner == user:
-            has_access = True
-        else:
-            member = note.members.filter(user=user).first()
-            if member and member.role == 'full_access':
-                has_access = True
-            else:
-                nb_member = note.notebook.members.filter(user=user).first()
-                if nb_member and nb_member.role == 'full_access':
-                    has_access = True
-                    
-        if not has_access:
-            return Response({'error': 'Permission denied.'}, status=403)
-            
-        version = get_object_or_404(NoteVersion, id=version_id, note=note)
-        
-        # Restore content
-        note.title = version.title
-        note.content_rich = version.content_rich
-        note.content_text = version.content_text
-        note.last_edited_by = user
-        note.save()
-        
-        # Create new version for the restoration
-        last_version = note.versions.order_by('-version_no').first()
-        next_version = (last_version.version_no + 1) if last_version else 1
-        
-        NoteVersion.objects.create(
-            note=note,
-            version_no=next_version,
-            title=note.title,
-            content_rich=note.content_rich,
-            content_text=note.content_text,
-            author=user
-        )
-        
-        return Response(NoteSerializer(note, context={'request': request}).data)
             
     def perform_destroy(self, instance):
         user = self.request.user
-        can_delete = False
         
-        if instance.author == user or instance.notebook.owner == user:
-            can_delete = True
-        
-        # Optional: Allow full_access to delete? 
-        # For now, let's stick to Owner/Author only for safety as per user request context ("deixando excluir")
-        # If 'full_access' implies delete, we can add it. But 'viewer' and 'editor' definitely NO.
-        
-        if not can_delete:
-            raise PermissionDenied("Only the owner/author can delete this note.")
+        if not user.is_superuser:
+            raise PermissionDenied("Apenas superusuários podem excluir notas permanentemente.")
             
         instance.delete()
 
@@ -236,6 +161,8 @@ class AttachmentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        if user.is_superuser:
+            return self.queryset.order_by('-created_at')
         return self.queryset.filter(
             Q(note__author=user) |
             Q(note__members__user=user) |
@@ -268,7 +195,9 @@ class ShareViewSet(viewsets.ViewSet):
         can_share = False
         user = request.user
         
-        if target_type == 'notebook':
+        if user.is_superuser:
+            can_share = True
+        elif target_type == 'notebook':
             notebook = get_object_or_404(Notebook, id=target_id)
             if notebook.owner == user:
                 can_share = True
@@ -278,6 +207,10 @@ class ShareViewSet(viewsets.ViewSet):
                     can_share = True
         elif target_type == 'note':
             note = get_object_or_404(Note, id=target_id)
+            
+            if note.is_trashed:
+                return Response({'error': 'Não é permitido compartilhar notas que estão na lixeira.'}, status=400)
+                
             if note.author == user:
                 can_share = True
             elif note.notebook.owner == user:
@@ -518,6 +451,8 @@ class ShareViewSet(viewsets.ViewSet):
 
     def _check_share_permission(self, user, target_type, target_id):
         can_share = False
+        if user.is_superuser:
+            return True
         if target_type == 'notebook':
             notebook = get_object_or_404(Notebook, id=target_id)
             if notebook.owner == user:

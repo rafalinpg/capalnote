@@ -30,6 +30,7 @@ export const useAuth = () => {
           email: userData.email,
           name: userData.name,
           avatar: undefined,
+          isSuperuser: userData.is_superuser,
         });
       } else {
         // Token inválido
@@ -100,6 +101,7 @@ export const useAuth = () => {
           email: data.user.email,
           name: data.user.name,
           avatar: undefined,
+          isSuperuser: data.user.is_superuser,
         });
         return { success: true };
       } else {

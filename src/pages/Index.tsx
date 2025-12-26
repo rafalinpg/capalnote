@@ -10,6 +10,7 @@ import { FileList } from '@/components/files/FileList';
 import { FilePreview } from '@/components/files/FilePreview';
 import { ShareModal } from '@/components/modals/ShareModal';
 import { SettingsModal } from '@/components/modals/SettingsModal';
+import { ConfirmationModal } from '@/components/modals/ConfirmationModal';
 import { SearchCommand } from '@/components/search/SearchCommand';
 import { Button } from '@/components/ui/button';
 import { Note, User } from '@/types';
@@ -37,13 +38,36 @@ export default function Index({ user, onLogout }: IndexProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const [confirmationModal, setConfirmationModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    confirmText: string;
+    cancelText: string;
+    variant: 'default' | 'destructive';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    confirmText: 'Confirmar',
+    cancelText: 'Cancelar',
+    variant: 'default',
+    onConfirm: () => {},
+  });
+
+  const closeConfirmationModal = () => {
+    setConfirmationModal(prev => ({ ...prev, isOpen: false }));
+  };
   
-  const [searchParams, setSearchParams] = useSearchParams();
+  const searchParams = useSearchParams()[0];
+  const setSearchParams = useSearchParams()[1];
   const { toast } = useToast();
   const inviteToken = searchParams.get('token');
 
   const { notebooks, createNotebook, updateNotebook, deleteNotebook } = useNotebooks();
-  const { notes, createNote, updateNote, deleteNote, permanentDeleteNote, restoreFromTrash, uploadAttachment, deleteAttachment, getHistory, restoreVersion } = useNotes();
+  const { notes, createNote, updateNote, deleteNote, permanentDeleteNote, restoreFromTrash, emptyTrash, uploadAttachment, deleteAttachment } = useNotes();
   const { tags, createTag, updateTag, deleteTag } = useTags();
 
   useEffect(() => {
@@ -216,6 +240,22 @@ export default function Index({ user, onLogout }: IndexProps) {
    };
 
   const handleUpdateNote = async (updatedNote: Partial<Note> & { id: string }) => {
+    // Check if note is trashed
+    const currentNote = notes.find(n => n.id === updatedNote.id);
+    // If we are only updating isTrashed (restoring/deleting), allow it.
+    // We check if 'isTrashed' is in updatedNote and distinct from current.
+    // But typically updateNote updates fields.
+    
+    // If the note is currently trashed, and we are NOT restoring it (setting isTrashed to false), block update.
+    if (currentNote?.isTrashed && updatedNote.isTrashed !== false) {
+       toast({
+         title: "Não permitido",
+         description: "Notas na lixeira não podem ser editadas.",
+         variant: "destructive",
+       });
+       return;
+    }
+
     try {
       await updateNote(updatedNote.id, updatedNote);
     } catch (error) {
@@ -226,29 +266,50 @@ export default function Index({ user, onLogout }: IndexProps) {
 
   const handleDeleteNote = async (noteId: string) => {
     if (activeSection === 'trash') {
-      if (window.confirm('Tem certeza que deseja excluir esta nota permanentemente? Esta ação não pode ser desfeita.')) {
-        try {
-          await permanentDeleteNote(noteId);
-          if (selectedNoteId === noteId) {
-            setSelectedNoteId(undefined);
-          }
-        } catch (error) {
-          console.error('Failed to delete note permanently:', error);
-          alert('Erro ao excluir nota permanentemente');
-        }
+      if (!user.isSuperuser) {
+        alert('Apenas superusuários podem excluir notas permanentemente.');
+        return;
       }
+
+      setConfirmationModal({
+        isOpen: true,
+        title: 'Excluir permanentemente?',
+        description: 'Cuidado: A nota desaparecerá para sempre. Esta ação não pode ser desfeita.',
+        confirmText: 'Excluir',
+        cancelText: 'Cancelar',
+        variant: 'destructive',
+        onConfirm: async () => {
+          try {
+            await permanentDeleteNote(noteId);
+            if (selectedNoteId === noteId) {
+              setSelectedNoteId(undefined);
+            }
+          } catch (error) {
+            console.error('Failed to delete note permanently:', error);
+            alert('Erro ao excluir nota permanentemente');
+          }
+        }
+      });
     } else {
-      if (window.confirm('Tem certeza que deseja mover esta nota para a lixeira?')) {
-        try {
-          await deleteNote(noteId);
-          if (selectedNoteId === noteId) {
-            setSelectedNoteId(undefined);
+      setConfirmationModal({
+        isOpen: true,
+        title: 'Mover para lixeira?',
+        description: 'Tem certeza que deseja mover esta nota para a lixeira?',
+        confirmText: 'Mover para lixeira',
+        cancelText: 'Cancelar',
+        variant: 'destructive',
+        onConfirm: async () => {
+          try {
+            await deleteNote(noteId);
+            if (selectedNoteId === noteId) {
+              setSelectedNoteId(undefined);
+            }
+          } catch (error) {
+            console.error('Failed to delete note:', error);
+            alert('Erro ao excluir nota');
           }
-        } catch (error) {
-          console.error('Failed to delete note:', error);
-          alert('Erro ao excluir nota');
         }
-      }
+      });
     }
   };
 
@@ -262,6 +323,36 @@ export default function Index({ user, onLogout }: IndexProps) {
       console.error('Failed to restore note:', error);
       alert('Erro ao restaurar nota');
     }
+  };
+
+  const handleEmptyTrash = async () => {
+    if (!user?.isSuperuser) return;
+    
+    setConfirmationModal({
+      isOpen: true,
+      title: 'Esvaziar lixeira?',
+      description: 'Tem certeza que deseja esvaziar a lixeira? Todas as notas na lixeira serão excluídas permanentemente.',
+      confirmText: 'Esvaziar Lixeira',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+      onConfirm: async () => {
+        try {
+          await emptyTrash();
+          setSelectedNoteId(undefined);
+          toast({
+            title: "Lixeira esvaziada",
+            description: "Todas as notas foram removidas permanentemente.",
+          });
+        } catch (error) {
+          console.error('Failed to empty trash:', error);
+          toast({
+            title: "Erro",
+            description: "Não foi possível esvaziar a lixeira.",
+            variant: "destructive"
+          });
+        }
+      }
+    });
   };
 
   const handleCreateNote = async () => {
@@ -279,6 +370,52 @@ export default function Index({ user, onLogout }: IndexProps) {
       console.error('Failed to create note:', error);
       alert('Erro ao criar nota. Verifique o console para mais detalhes.');
     }
+  };
+
+  const handleDeleteNotebook = async (id: string) => {
+    setConfirmationModal({
+      isOpen: true,
+      title: 'Excluir caderno?',
+      description: 'Tem certeza que deseja excluir este caderno? Esta ação não pode ser desfeita.',
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+      onConfirm: async () => {
+        try {
+          await deleteNotebook(id);
+          if (selectedNotebookId === id) {
+            setSelectedNotebookId(undefined);
+            setActiveSection('recent');
+          }
+        } catch (error) {
+           console.error("Failed to delete notebook", error);
+           toast({ title: "Erro", description: "Erro ao excluir caderno", variant: "destructive" });
+        }
+      }
+    });
+  };
+
+  const handleDeleteTag = async (id: string) => {
+    setConfirmationModal({
+      isOpen: true,
+      title: 'Excluir etiqueta?',
+      description: 'Tem certeza que deseja excluir esta etiqueta?',
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+      onConfirm: async () => {
+        try {
+          await deleteTag(id);
+          if (selectedTagId === id) {
+            setSelectedTagId(undefined);
+            setActiveSection('recent');
+          }
+        } catch (error) {
+           console.error("Failed to delete tag", error);
+           toast({ title: "Erro", description: "Erro ao excluir etiqueta", variant: "destructive" });
+        }
+      }
+    });
   };
 
   const handleSearchSelect = (note: Note) => {
@@ -307,11 +444,11 @@ export default function Index({ user, onLogout }: IndexProps) {
         notebooks={notebooks}
         onCreateNotebook={createNotebook}
         onUpdateNotebook={updateNotebook}
-        onDeleteNotebook={deleteNotebook}
+        onDeleteNotebook={handleDeleteNotebook}
         tags={tags}
         onCreateTag={createTag}
         onUpdateTag={updateTag}
-        onDeleteTag={deleteTag}
+        onDeleteTag={handleDeleteTag}
       />
 
       {/* Main Content */}
@@ -351,6 +488,7 @@ export default function Index({ user, onLogout }: IndexProps) {
                 onRestore={handleRestoreNote}
                 title={getSectionTitle()}
                 isTrash={activeSection === 'trash'}
+                onEmptyTrash={activeSection === 'trash' && user?.isSuperuser ? handleEmptyTrash : undefined}
                 subtitle={
                   activeSection === 'notebooks' && selectedNotebookId
                     ? notebooks?.find((n) => n.id === selectedNotebookId)?.description
@@ -407,8 +545,6 @@ export default function Index({ user, onLogout }: IndexProps) {
                 onUploadAttachment={(file, type) => uploadAttachment(selectedNote.id, file, type)}
                 onDeleteAttachment={deleteAttachment}
                 onShare={() => setShareTarget({ type: 'note', id: selectedNote.id, name: selectedNote.title })}
-                getHistory={getHistory}
-                restoreVersion={restoreVersion}
               />
             </motion.div>
           ) : (
@@ -427,6 +563,18 @@ export default function Index({ user, onLogout }: IndexProps) {
         onOpenChange={setIsSettingsModalOpen}
         user={user}
         onUpdateUser={() => window.location.reload()}
+      />
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmationModal.isOpen}
+        onClose={closeConfirmationModal}
+        onConfirm={confirmationModal.onConfirm}
+        title={confirmationModal.title}
+        description={confirmationModal.description}
+        confirmText={confirmationModal.confirmText}
+        cancelText={confirmationModal.cancelText}
+        variant={confirmationModal.variant}
       />
 
       {/* Share Modal */}

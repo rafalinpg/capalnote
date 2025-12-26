@@ -24,7 +24,6 @@ import {
   MoreHorizontal,
   Pin,
   Trash2,
-  History,
   Tag,
   ChevronDown,
   X,
@@ -35,13 +34,16 @@ import {
   Heading3,
   Type,
   Check,
+  AlertCircle,
+  Printer,
 } from 'lucide-react';
 import { Extension } from '@tiptap/core';
 import { cn } from '@/lib/utils';
-import { Note, Notebook, Tag as TagType, Attachment, NoteVersion } from '@/types';
+import { Note, Notebook, Tag as TagType, Attachment } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,7 +53,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { HistoryDialog } from './HistoryDialog';
 
 import { useToast } from '@/hooks/use-toast';
 
@@ -119,24 +120,21 @@ interface NoteEditorProps {
   onUploadAttachment: (file: File, type?: 'image' | 'audio' | 'file' | 'sketch') => Promise<Attachment>;
   onDeleteAttachment: (attachmentId: string) => Promise<void>;
   onShare: () => void;
-  getHistory: (noteId: string) => Promise<NoteVersion[]>;
-  restoreVersion: (noteId: string, versionId: string) => Promise<any>;
 }
 
-export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete, onUploadAttachment, onDeleteAttachment, onShare, getHistory, restoreVersion }: NoteEditorProps) {
+export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete, onUploadAttachment, onDeleteAttachment, onShare }: NoteEditorProps) {
   const [title, setTitle] = useState(note.title);
   const [isPinned, setIsPinned] = useState(note.isPinned);
   const [selectedTags, setSelectedTags] = useState(note.tags);
   const [showTagSelector, setShowTagSelector] = useState(false);
   const [selectedNotebookId, setSelectedNotebookId] = useState(note.notebookId);
   const [localAttachments, setLocalAttachments] = useState<Attachment[]>(note.attachments || []);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const { toast } = useToast();
 
   const role = note.userRole || 'viewer';
 
-  const canEdit = role === 'owner' || role === 'editor' || role === 'full_access';
-  const canShare = role === 'owner' || role === 'full_access';
+  const canEdit = (role === 'owner' || role === 'editor' || role === 'full_access') && !note.isTrashed;
+  const canShare = (role === 'owner' || role === 'full_access') && !note.isTrashed;
   const canDelete = role === 'owner';
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -240,9 +238,11 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
 
     const newContentRich = editor.getHTML();
     
+    const titleToSave = !title || title.trim() === '' ? 'Sem título' : title;
+
     // Check if there are actual changes
     const hasChanges = 
-      title !== note.title ||
+      titleToSave !== note.title ||
       newContentRich !== note.contentRich ||
       isPinned !== note.isPinned ||
       selectedNotebookId !== note.notebookId ||
@@ -255,7 +255,7 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
     try {
       await onUpdate({
         ...note,
-        title,
+        title: titleToSave,
         contentRich: newContentRich,
         contentText: editor.getText(),
         isPinned,
@@ -357,15 +357,17 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
     setIsPinned(newPinned);
     
     const newContentRich = editor?.getHTML() || '';
+    const titleToSave = !title || title.trim() === '' ? 'Sem título' : title;
+    
     const hasContentChanges = 
-      title !== note.title ||
+      titleToSave !== note.title ||
       newContentRich !== note.contentRich;
 
     if (hasContentChanges) {
         // If there are content changes, send full update
         onUpdate({
             ...note,
-            title,
+            title: titleToSave,
             contentRich: newContentRich,
             contentText: editor?.getText() || '',
             isPinned: newPinned,
@@ -432,6 +434,10 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
     }
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   if (!editor) {
     return null;
   }
@@ -443,28 +449,21 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
       exit={{ opacity: 0, x: 20 }}
       className="h-full flex flex-col bg-card"
     >
+      <div id="print-container" style={{ display: 'none' }}>
+        <h1 style={{ fontSize: '2em', marginBottom: '1em', fontWeight: 'bold' }}>{title || 'Sem título'}</h1>
+        <div 
+            className="prose prose-lg max-w-none"
+            dangerouslySetInnerHTML={{ __html: editor.getHTML() }}
+        />
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-border">
         <div className="flex items-center gap-3">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild disabled={!canEdit}>
-              <Button variant="ghost" className="gap-2 text-muted-foreground hover:text-foreground" disabled={!canEdit}>
-                <span className="w-2 h-2 rounded-full bg-primary" />
-                {notebook?.name || 'Sem caderno'}
-                <ChevronDown className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              {notebooks
-                .filter((n) => !n.isArchived)
-                .map((n) => (
-                  <DropdownMenuItem key={n.id} onClick={() => setSelectedNotebookId(n.id)}>
-                    <span className="w-2 h-2 rounded-full bg-primary mr-2" />
-                    {n.name}
-                  </DropdownMenuItem>
-                ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-2 text-muted-foreground px-3 py-2">
+            <span className="w-2 h-2 rounded-full bg-primary" />
+            <span className="text-sm font-medium">{notebook?.name || 'Sem caderno'}</span>
+          </div>
 
           <span className="text-muted-foreground">•</span>
 
@@ -502,9 +501,9 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
                   Compartilhar
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem>
-                <History className="w-4 h-4 mr-2" />
-                Ver histórico
+              <DropdownMenuItem onClick={handlePrint}>
+                <Printer className="w-4 h-4 mr-2" />
+                Imprimir
               </DropdownMenuItem>
               {canDelete && (
                 <>
@@ -665,6 +664,16 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
       {/* Editor Content */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto px-6 py-8">
+          {note.isTrashed && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Nota na Lixeira</AlertTitle>
+              <AlertDescription>
+                Esta nota está na lixeira e não pode ser editada. Restaure-a para fazer alterações.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Title */}
           <input
             type="text"
@@ -792,14 +801,6 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
           <span>{editor.storage.characterCount?.words?.() || 0} palavras</span>
         </div>
       </div>
-      {/* Search Command */}
-      <HistoryDialog
-        open={isHistoryOpen}
-        onOpenChange={setIsHistoryOpen}
-        noteId={note.id}
-        getHistory={getHistory}
-        restoreVersion={restoreVersion}
-      />
     </motion.div>
   );
 }

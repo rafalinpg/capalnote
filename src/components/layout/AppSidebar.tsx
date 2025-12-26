@@ -320,9 +320,7 @@ export function AppSidebar({
                       <ContextMenuItem
                         className="text-destructive focus:text-destructive"
                         onClick={() => {
-                          if (confirm('Tem certeza que deseja excluir este caderno?')) {
-                            onDeleteNotebook(notebook.id);
-                          }
+                          onDeleteNotebook(notebook.id);
                         }}
                       >
                         Excluir
@@ -480,9 +478,7 @@ export function AppSidebar({
                       <ContextMenuItem
                         className="text-destructive focus:text-destructive"
                         onClick={() => {
-                          if (confirm('Tem certeza que deseja excluir esta etiqueta?')) {
-                            onDeleteTag(tag.id);
-                          }
+                          onDeleteTag(tag.id);
                         }}
                       >
                         Excluir
