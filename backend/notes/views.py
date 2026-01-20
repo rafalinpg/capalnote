@@ -237,8 +237,8 @@ class ShareViewSet(viewsets.ViewSet):
             invited_by=request.user
         )
         
-        # Use the configured frontend port (8080)
-        invite_link = f"http://localhost:8080/register?token={token}"
+        # Use the configured frontend port (8081)
+        invite_link = f"http://localhost:8081/register?token={token}"
         
         # Send email
         print(f"Sending invite to {email} with token {token}")
@@ -340,8 +340,8 @@ class ShareViewSet(viewsets.ViewSet):
         if not can_share:
             return Response({'error': 'Permission denied'}, status=403)
             
-        # Use the configured frontend port (8080)
-        invite_link = f"http://localhost:8080/register?token={invitation.token}"
+        # Use the configured frontend port (8081)
+        invite_link = f"http://localhost:8081/register?token={invitation.token}"
         
         try:
             send_mail(
