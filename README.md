@@ -24,61 +24,156 @@ CapalNote é uma aplicação de gerenciamento de notas e cadernos para a Coopera
 - **Backend**:
   - Django
   - Django REST Framework
-  - SQLite (Desenvolvimento)
+  - PostgreSQL (Produção) / SQLite (Opcional em Dev)
 
-## Como rodar o projeto
+## Instalação e Deploy
 
-### Pré-requisitos
+### Pré-requisitos Gerais
 
 - Node.js (v18+)
 - Python (v3.10+)
+- PostgreSQL (Recomendado para produção)
 
-### Backend
+### Configuração de Variáveis de Ambiente
 
-1. Navegue até a pasta `backend`:
-   ```sh
-   cd backend
+Para garantir a segurança e configuração correta em diferentes ambientes, recomenda-se configurar variáveis de ambiente. Você pode criar um arquivo `.env` na pasta `backend/core/` ou configurar diretamente no sistema operacional.
+
+Variáveis sugeridas para o `settings.py` (necessário ajustar o código para lê-las):
+- `SECRET_KEY`: Chave secreta do Django (gerar uma nova para produção).
+- `DEBUG`: `False` para produção.
+- `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`: Credenciais do banco de dados.
+
+---
+
+### 🐧 Instalação em Servidor Linux (Ubuntu/Debian)
+
+#### 1. Configurar Banco de Dados (PostgreSQL)
+```bash
+sudo apt update
+sudo apt install postgresql postgresql-contrib
+sudo -u postgres psql
+```
+No prompt do PostgreSQL:
+```sql
+CREATE DATABASE capalnote;
+CREATE USER capalnote_user WITH PASSWORD 'sua_senha_segura';
+ALTER ROLE capalnote_user SET client_encoding TO 'utf8';
+ALTER ROLE capalnote_user SET default_transaction_isolation TO 'read committed';
+ALTER ROLE capalnote_user SET timezone TO 'UTC';
+GRANT ALL PRIVILEGES ON DATABASE capalnote TO capalnote_user;
+\q
+```
+
+#### 2. Backend (Django + Gunicorn)
+1. Instale dependências do sistema:
+   ```bash
+   sudo apt install python3-venv python3-dev libpq-dev nginx curl
    ```
 
-2. Crie um ambiente virtual e ative-o:
-   ```sh
-   python -m venv venv
-   # Windows
-   .\venv\Scripts\activate
-   # Linux/Mac
+2. Clone o repositório e configure o backend:
+   ```bash
+   # Exemplo: /var/www/capalnote
+   cd /var/www/capalnote/backend
+   python3 -m venv venv
    source venv/bin/activate
-   ```
-
-3. Instale as dependências:
-   ```sh
    pip install -r requirements.txt
    ```
 
-4. Execute as migrações:
-   ```sh
+3. Aplique as migrações:
+   ```bash
    python manage.py migrate
+   python manage.py collectstatic
    ```
 
-5. Inicie o servidor:
-   ```sh
+4. Execute com Gunicorn (ou configure um serviço Systemd):
+   ```bash
+   gunicorn --bind 0.0.0.0:8000 core.wsgi
+   ```
+
+#### 3. Frontend (Build + Nginx)
+1. Instale dependências e faça o build:
+   ```bash
+   cd ../
+   npm install
+   npm run build
+   ```
+   O build será gerado na pasta `dist`.
+
+2. Configure o Nginx (exemplo básico em `/etc/nginx/sites-available/capalnote`):
+   ```nginx
+   server {
+       listen 80;
+       server_name seu_dominio_ou_ip;
+
+       location / {
+           root /var/www/capalnote/dist;
+           try_files $uri $uri/ /index.html;
+       }
+
+       location /api/ {
+           proxy_pass http://127.0.0.1:8000;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+       }
+   }
+   ```
+3. Ative o site e reinicie o Nginx:
+   ```bash
+   sudo ln -s /etc/nginx/sites-available/capalnote /etc/nginx/sites-enabled
+   sudo systemctl restart nginx
+   ```
+
+---
+
+### 🪟 Instalação em Servidor Windows
+
+#### 1. Backend
+1. Instale o Python e PostgreSQL para Windows.
+2. Crie o banco de dados via pgAdmin.
+3. No PowerShell (como Administrador):
+   ```powershell
+   cd backend
+   python -m venv venv
+   .\venv\Scripts\Activate
+   pip install -r requirements.txt
+   python manage.py migrate
+   ```
+4. Para rodar em produção no Windows, utilize o **Waitress**:
+   ```powershell
+   waitress-serve --listen=*:8000 core.wsgi:application
+   ```
+
+#### 2. Frontend
+1. Instale o Node.js.
+2. Na raiz do projeto:
+   ```powershell
+   npm install
+   npm run build
+   ```
+3. Para servir a pasta `dist`, você pode usar o **IIS** ou o pacote `serve`:
+   ```powershell
+   npm install -g serve
+   serve -s dist -l 8081
+   ```
+
+---
+
+### 🛠️ Desenvolvimento Local
+
+1. **Backend**:
+   ```bash
+   cd backend
+   python -m venv venv
+   source venv/bin/activate  # Linux/Mac
+   .\venv\Scripts\activate   # Windows
+   pip install -r requirements.txt
+   python manage.py migrate
    python manage.py runserver
    ```
 
-### Frontend
-
-1. Navegue até a raiz do projeto:
-   ```sh
-   cd ..
-   ```
-
-2. Instale as dependências:
-   ```sh
+2. **Frontend**:
+   ```bash
    npm install
-   ```
-
-3. Inicie o servidor de desenvolvimento:
-   ```sh
    npm run dev
    ```
-
-A aplicação estará disponível em `http://localhost:8080`.
+   Acesse: `http://localhost:8081`
