@@ -61,7 +61,7 @@ EMAIL_HOST_USER=seu_email@gmail.com
 EMAIL_HOST_PASSWORD=sua_senha_de_app
 
 # CORS (Frontend)
-CORS_ALLOWED_ORIGINS=http://seu-dominio.com,http://localhost:8081
+CORS_ALLOWED_ORIGINS=http://seu-dominio.com,http://localhost:8080
 ```
 
 > **Nota:** Nunca comite o arquivo `.env` no Git. Ele contém senhas e chaves de segurança.
@@ -176,7 +176,7 @@ GRANT ALL PRIVILEGES ON DATABASE capalnote TO capalnote_user;
 3. Para servir a pasta `dist`, você pode usar o **IIS** ou o pacote `serve`:
    ```powershell
    npm install -g serve
-   serve -s dist -l 8081
+   serve -s dist -l 8080
    ```
 
 ---
@@ -199,4 +199,4 @@ GRANT ALL PRIVILEGES ON DATABASE capalnote TO capalnote_user;
    npm install
    npm run dev
    ```
-   Acesse: `http://localhost:8081`
+   Acesse: `http://localhost:8080`
