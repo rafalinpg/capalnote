@@ -353,8 +353,8 @@ class ShareViewSet(viewsets.ViewSet):
         if not base_url:
             if not settings.DEBUG:
                 host = request.get_host()
-                scheme = request.scheme
-                base_url = f"{scheme}://{host}"
+                # Force HTTPS in production
+                base_url = f"https://{host}"
             else:
                 base_url = "http://localhost:8080"
         
