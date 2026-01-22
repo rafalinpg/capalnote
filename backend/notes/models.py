@@ -112,6 +112,7 @@ class ShareInvitation(models.Model):
     invited_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sent_invitations")
     status = models.CharField(max_length=16, default='pending', choices=(('pending', 'pending'), ('accepted', 'accepted'), ('expired', 'expired')))
     created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Invite {self.email} to {self.target_type} {self.target_id}"

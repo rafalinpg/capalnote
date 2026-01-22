@@ -19,6 +19,7 @@ import { useNotebooks } from '@/hooks/useNotebooks';
 import { useNotes } from '@/hooks/useNotes';
 import { useTags } from '@/hooks/useTags';
 import { useToast } from '@/hooks/use-toast';
+import { API_URL } from '@/lib/api';
 
 type NavSection = 'notebooks' | 'tags' | 'pinned' | 'recent' | 'archived' | 'trash' | 'all_notes' | 'files';
 
@@ -65,16 +66,16 @@ export default function Index({ user, onLogout }: IndexProps) {
   const setSearchParams = useSearchParams()[1];
   const { toast } = useToast();
   const inviteToken = searchParams.get('token');
-
-  const { notebooks, createNotebook, updateNotebook, deleteNotebook } = useNotebooks();
-  const { notes, createNote, updateNote, deleteNote, permanentDeleteNote, restoreFromTrash, emptyTrash, uploadAttachment, deleteAttachment } = useNotes();
+  
+  const { notebooks, createNotebook, updateNotebook, deleteNotebook, refresh: refreshNotebooks } = useNotebooks();
+  const { notes, createNote, updateNote, deleteNote, permanentDeleteNote, restoreFromTrash, emptyTrash, uploadAttachment, deleteAttachment, refreshNotes } = useNotes();
   const { tags, createTag, updateTag, deleteTag } = useTags();
 
   useEffect(() => {
     const acceptInvite = async (token: string) => {
         try {
             const authToken = localStorage.getItem('access_token');
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/share/accept/`, {
+            const response = await fetch(`${API_URL}/share/accept/`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${authToken}`,
@@ -89,7 +90,8 @@ export default function Index({ user, onLogout }: IndexProps) {
                     description: "Você agora tem acesso ao item compartilhado.",
                 });
                 setSearchParams({}, { replace: true });
-                window.location.reload(); 
+                refreshNotebooks();
+                refreshNotes();
             } else {
                  toast({
                     title: "Erro",

@@ -29,8 +29,8 @@ class NotebookMemberSerializer(serializers.ModelSerializer):
 class ShareInvitationSerializer(serializers.ModelSerializer):
     class Meta:
         model = ShareInvitation
-        fields = ['id', 'email', 'target_type', 'target_id', 'role', 'status', 'created_at']
-        read_only_fields = ['token', 'status', 'created_at']
+        fields = ['id', 'email', 'target_type', 'target_id', 'role', 'status', 'created_at', 'expires_at']
+        read_only_fields = ['token', 'status', 'created_at', 'expires_at']
 
 class TagSerializer(serializers.ModelSerializer):
     class Meta:

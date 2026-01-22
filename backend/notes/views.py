@@ -8,6 +8,9 @@ from django.shortcuts import get_object_or_404
 from django.utils.crypto import get_random_string
 from django.core.mail import send_mail
 from django.conf import settings
+from django.utils import timezone
+from datetime import timedelta
+import os
 from .models import Notebook, Note, Tag, Attachment, NoteMember, NotebookMember, ShareInvitation
 from .serializers import (
     NotebookSerializer, NoteSerializer, TagSerializer, AttachmentSerializer, 
@@ -234,7 +237,8 @@ class ShareViewSet(viewsets.ViewSet):
             target_id=target_id,
             role=role,
             token=token,
-            invited_by=request.user
+            invited_by=request.user,
+            expires_at=timezone.now() + timedelta(days=7)
         )
         
         # In production, use the actual domain
@@ -268,7 +272,18 @@ class ShareViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['post'])
     def accept(self, request):
         token = request.data.get('token')
-        invitation = get_object_or_404(ShareInvitation, token=token, status='pending')
+        invitation = get_object_or_404(ShareInvitation, token=token)
+        
+        if invitation.status == 'accepted':
+            return Response({'status': 'success', 'message': 'Already accepted'})
+            
+        if invitation.status == 'expired':
+            return Response({'error': 'Invite expired'}, status=400)
+            
+        if invitation.expires_at and invitation.expires_at < timezone.now():
+            invitation.status = 'expired'
+            invitation.save()
+            return Response({'error': 'Invite expired'}, status=400)
         
         user = request.user
         
