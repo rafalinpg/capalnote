@@ -22,7 +22,7 @@ interface SettingsModalProps {
   onUpdateUser: (data: any) => void;
 }
 
-const API_URL = `http://${window.location.hostname}:8000/api`;
+import { API_URL } from '@/lib/api';
 
 export function SettingsModal({ open, onOpenChange, user, onUpdateUser }: SettingsModalProps) {
   const { toast } = useToast();

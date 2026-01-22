@@ -68,8 +68,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-
-const API_URL = `http://${window.location.hostname}:8000/api`;
+import { API_URL } from '@/lib/api';
 
 export function ShareModal({ open, onOpenChange, itemType, itemId, itemName }: ShareModalProps) {
   const { token, user } = useAuth();

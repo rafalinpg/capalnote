@@ -73,9 +73,8 @@ export default function Index({ user, onLogout }: IndexProps) {
   useEffect(() => {
     const acceptInvite = async (token: string) => {
         try {
-            const API_URL = `http://${window.location.hostname}:8000/api`;
             const authToken = localStorage.getItem('access_token');
-            const response = await fetch(`${API_URL}/share/accept/`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/share/accept/`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${authToken}`,

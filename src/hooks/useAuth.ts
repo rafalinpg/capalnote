@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { User } from '@/types';
-
-const API_URL = `http://${window.location.hostname}:8000/api`;
+import { API_URL } from '@/lib/api';
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);

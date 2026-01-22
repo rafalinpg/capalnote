@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Notebook } from '../types';
 import { useAuth } from './useAuth';
-
-const API_URL = `http://${window.location.hostname}:8000/api`;
+import { API_URL } from '@/lib/api';
 
 interface NotebookBackend {
   id: number;
