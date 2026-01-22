@@ -36,12 +36,35 @@ CapalNote é uma aplicação de gerenciamento de notas e cadernos para a Coopera
 
 ### Configuração de Variáveis de Ambiente
 
-Para garantir a segurança e configuração correta em diferentes ambientes, recomenda-se configurar variáveis de ambiente. Você pode criar um arquivo `.env` na pasta `backend/core/` ou configurar diretamente no sistema operacional.
+Para produção, é **obrigatório** criar um arquivo `.env` na pasta `backend/` (no mesmo nível do `manage.py`).
 
-Variáveis sugeridas para o `settings.py` (necessário ajustar o código para lê-las):
-- `SECRET_KEY`: Chave secreta do Django (gerar uma nova para produção).
-- `DEBUG`: `False` para produção.
-- `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`: Credenciais do banco de dados.
+Exemplo de conteúdo para o arquivo `.env`:
+
+```ini
+# Segurança
+DEBUG=False
+SECRET_KEY=sua-chave-secreta-gerada-aleatoriamente
+ALLOWED_HOSTS=seu-dominio.com,192.168.0.214,localhost
+
+# Banco de Dados
+DB_NAME=capalnote
+DB_USER=capalnote_user
+DB_PASSWORD=sua_senha_segura
+DB_HOST=localhost
+DB_PORT=5432
+
+# Email (opcional, para convites)
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=True
+EMAIL_HOST_USER=seu_email@gmail.com
+EMAIL_HOST_PASSWORD=sua_senha_de_app
+
+# CORS (Frontend)
+CORS_ALLOWED_ORIGINS=http://seu-dominio.com,http://localhost:8081
+```
+
+> **Nota:** Nunca comite o arquivo `.env` no Git. Ele contém senhas e chaves de segurança.
 
 ---
 
