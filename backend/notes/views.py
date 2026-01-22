@@ -347,13 +347,16 @@ class ShareViewSet(viewsets.ViewSet):
         if not can_share:
             return Response({'error': 'Permission denied'}, status=403)
             
-        # In production, use the actual domain
-        # In development, use localhost:8080
-        base_url = "http://localhost:8080"
-        if not settings.DEBUG:
-            # Try to get from request header or settings
-            host = request.get_host()
-            base_url = f"http://{host}" # In prod this might need adjustment for frontend URL
+        # Determine base URL for invite link
+        base_url = os.environ.get('FRONTEND_URL')
+        
+        if not base_url:
+            if not settings.DEBUG:
+                host = request.get_host()
+                scheme = request.scheme
+                base_url = f"{scheme}://{host}"
+            else:
+                base_url = "http://localhost:8080"
         
         invite_link = f"{base_url}/register?token={invitation.token}"
         
