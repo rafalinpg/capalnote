@@ -5,7 +5,13 @@ export const getApiUrl = () => {
     return '/api';
   }
   
-  // Em desenvolvimento, assumimos que o backend está rodando na porta 8000
+  // Se estivermos rodando em HTTPS (ex: via túnel ou proxy reverso em homologação),
+  // devemos usar URL relativa para evitar Mixed Content
+  if (window.location.protocol === 'https:') {
+    return '/api';
+  }
+  
+  // Em desenvolvimento local (HTTP), assumimos que o backend está rodando na porta 8000
   return `http://${window.location.hostname}:8000/api`;
 };
 

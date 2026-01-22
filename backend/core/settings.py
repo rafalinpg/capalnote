@@ -181,6 +181,9 @@ if not DEBUG:
 
     # Trust the X-Forwarded-Proto header for identifying HTTPS (required for proxies like Nginx/Gunicorn)
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    
+    # CSRF Trusted Origins (required for Django 4.0+ when using HTTPS)
+    CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", "http://localhost:8080").split(",")
 
 from datetime import timedelta
 
