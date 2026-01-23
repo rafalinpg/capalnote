@@ -495,6 +495,11 @@ export default function Index({ user, onLogout }: IndexProps) {
                     ? notebooks?.find((n) => n.id === selectedNotebookId)?.description
                     : undefined
                 }
+                creatorName={
+                  activeSection === 'notebooks' && selectedNotebookId
+                    ? notebooks?.find((n) => n.id === selectedNotebookId)?.ownerId
+                    : undefined
+                }
                 onShare={activeSection === 'notebooks' && selectedNotebookId ? () => {
                    const notebook = notebooks.find(n => n.id === selectedNotebookId);
                    if (notebook) {
@@ -549,11 +554,9 @@ export default function Index({ user, onLogout }: IndexProps) {
               />
             </motion.div>
           ) : (
-            filteredNotes.length > 0 && (
-              <div className="flex-1 min-w-0">
-                <EmptyState onCreateNote={handleCreateNote} />
-              </div>
-            )
+            <div className="flex-1 min-w-0">
+              <EmptyState onCreateNote={handleCreateNote} />
+            </div>
           )}
         </AnimatePresence>
       </div>

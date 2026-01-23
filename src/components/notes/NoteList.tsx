@@ -25,9 +25,10 @@ interface NoteListProps {
   onShare?: () => void;
   onEmptyTrash?: () => void;
   userRole?: AccessRole;
+  creatorName?: string;
 }
 
-export function NoteList({ notes, selectedNoteId, onNoteSelect, onDelete, onRestore, title, subtitle, isTrash, onShare, onEmptyTrash, userRole }: NoteListProps) {
+export function NoteList({ notes, selectedNoteId, onNoteSelect, onDelete, onRestore, title, subtitle, isTrash, onShare, onEmptyTrash, userRole, creatorName }: NoteListProps) {
   const pinnedNotes = notes.filter((n) => n.isPinned);
   const regularNotes = notes.filter((n) => !n.isPinned);
   
@@ -139,6 +140,7 @@ export function NoteList({ notes, selectedNoteId, onNoteSelect, onDelete, onRest
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0 flex-1">
             <h2 className="text-2xl font-semibold text-foreground truncate">{title}</h2>
+            {creatorName && <p className="text-xs text-muted-foreground mt-1">Criado por: {creatorName}</p>}
             {subtitle && <p className="text-sm text-muted-foreground mt-1 truncate">{subtitle}</p>}
             <p className="text-sm text-muted-foreground mt-2">
               {notes.length} {notes.length === 1 ? 'nota' : 'notas'}
