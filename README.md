@@ -139,6 +139,13 @@ GRANT ALL PRIVILEGES ON DATABASE capalnote TO capalnote_user;
            proxy_set_header X-Real-IP $remote_addr;
            client_max_body_size 50M;
        }
+
+       location /media/ {
+           alias /var/www/capalnote/backend/media/;
+           expires 30d;
+           access_log off;
+           add_header Cache-Control "public";
+       }
    }
    ```
 3. Ative o site e reinicie o Nginx:
@@ -146,6 +153,23 @@ GRANT ALL PRIVILEGES ON DATABASE capalnote TO capalnote_user;
    sudo ln -s /etc/nginx/sites-available/capalnote /etc/nginx/sites-enabled
    sudo systemctl restart nginx
    ```
+
+### ⚠️ Solução de Problemas Comuns (Troubleshooting)
+
+#### Erro 404 ou "Arquivo Corrompido" ao baixar anexos
+Se o upload funciona mas o download falha (erro 404 ou PDF em branco/corrompido), geralmente é um problema de permissão de arquivo no servidor Linux. O Nginx precisa de permissão para ler os arquivos criados pelo backend.
+
+Execute estes comandos no servidor para corrigir as permissões recursivamente:
+
+```bash
+# Garante que o usuário do Nginx (www-data) seja dono da pasta de mídia
+sudo chown -R www-data:www-data /var/www/capalnote/backend/media
+
+# Garante permissões de leitura para todos e escrita apenas para o dono
+sudo chmod -R 755 /var/www/capalnote/backend/media
+```
+
+Isso resolverá o acesso para arquivos dentro de subpastas como `media/attachments/`.
 
 ---
 
