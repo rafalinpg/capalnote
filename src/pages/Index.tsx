@@ -548,7 +548,17 @@ export default function Index({ user, onLogout }: IndexProps) {
                 onClose={() => setSelectedNoteId(undefined)}
                 onUpdate={handleUpdateNote}
                 onDelete={handleDeleteNote}
-                onUploadAttachment={(file, type) => uploadAttachment(selectedNote.id, file, type)}
+                onUploadAttachment={async (file, type) => {
+                  if (file.size > 50 * 1024 * 1024) {
+                    toast({
+                      title: "Arquivo muito grande",
+                      description: "O tamanho máximo permitido é de 50MB.",
+                      variant: "destructive"
+                    });
+                    throw new Error("File too large");
+                  }
+                  return uploadAttachment(selectedNote.id, file, type);
+                }}
                 onDeleteAttachment={deleteAttachment}
                 onShare={() => setShareTarget({ type: 'note', id: selectedNote.id, name: selectedNote.title })}
               />

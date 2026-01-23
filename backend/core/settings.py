@@ -186,6 +186,10 @@ if not DEBUG:
     # CSRF Trusted Origins (required for Django 4.0+ when using HTTPS)
     CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", "http://localhost:8080").split(",")
 
+# File Upload Limits (50MB)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB
+
 from datetime import timedelta
 
 SIMPLE_JWT = {
