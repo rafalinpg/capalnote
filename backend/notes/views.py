@@ -116,13 +116,14 @@ class NoteViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         note = serializer.instance
         user = self.request.user
+        print(f"DEBUG: User={user.username}, Super={user.is_superuser}, Note={note.id}")
         
         # Check if only is_pinned is being updated (to avoid updating updated_at)
         # However, we still need to check permissions for pinning!
         
         # Determine user role
         role = 'viewer' # Default
-        if note.author == user or note.notebook.owner == user:
+        if note.author == user or note.notebook.owner == user or user.is_superuser:
             role = 'owner'
         else:
             member = note.members.filter(user=user).first()
