@@ -6,5 +6,5 @@ class NotesConfig(AppConfig):
     name = "notes"
 
     def ready(self):
-        import notes.signals
+        import notes.signals  # Import signals
 
