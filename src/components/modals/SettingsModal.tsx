@@ -23,9 +23,11 @@ interface SettingsModalProps {
 }
 
 import { API_URL } from '@/lib/api';
+import { useAuth } from "@/hooks/useAuth";
 
 export function SettingsModal({ open, onOpenChange, user, onUpdateUser }: SettingsModalProps) {
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState("security");
   
   // Form states
@@ -35,6 +37,13 @@ export function SettingsModal({ open, onOpenChange, user, onUpdateUser }: Settin
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  const [users, setUsers] = useState<Array<{id:number; username:string; email:string; first_name:string; last_name:string; is_superuser:boolean}>>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserFirstName, setNewUserFirstName] = useState('');
+  const [newUserLastName, setNewUserLastName] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
 
   useEffect(() => {
     if (open && user) {
@@ -45,6 +54,33 @@ export function SettingsModal({ open, onOpenChange, user, onUpdateUser }: Settin
       setConfirmPassword('');
     }
   }, [open, user]);
+
+  const fetchUsers = async () => {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    setLoadingUsers(true);
+    try {
+      const res = await fetch(`${API_URL}/users/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || 'Falha ao carregar usuários');
+      }
+      const data = await res.json();
+      setUsers(data);
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open && activeTab === 'users' && currentUser?.isSuperuser) {
+      fetchUsers();
+    }
+  }, [open, activeTab, currentUser?.isSuperuser]);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,6 +195,40 @@ export function SettingsModal({ open, onOpenChange, user, onUpdateUser }: Settin
     }
   };
 
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/users/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          username: newUserEmail,
+          email: newUserEmail,
+          first_name: newUserFirstName,
+          last_name: newUserLastName,
+          password: newUserPassword
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || data.error || 'Falha ao criar usuário');
+      }
+      setNewUserEmail('');
+      setNewUserFirstName('');
+      setNewUserLastName('');
+      setNewUserPassword('');
+      toast({ title: 'Usuário criado', description: 'O usuário foi criado com sucesso.' });
+      fetchUsers();
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl h-[500px] flex flex-col p-0 gap-0 overflow-hidden">
@@ -183,7 +253,15 @@ export function SettingsModal({ open, onOpenChange, user, onUpdateUser }: Settin
                   <Lock className="w-4 h-4" />
                   Login e segurança
                 </TabsTrigger>
-                {/* Future tabs can be added here */}
+                {currentUser?.isSuperuser && (
+                  <TabsTrigger 
+                    value="users"
+                    className="w-full justify-start gap-2 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
+                  >
+                    <User className="w-4 h-4" />
+                    Usuários
+                  </TabsTrigger>
+                )}
               </TabsList>
             </div>
             
@@ -277,6 +355,74 @@ export function SettingsModal({ open, onOpenChange, user, onUpdateUser }: Settin
                   </form>
                 </div>
               </TabsContent>
+              
+              {currentUser?.isSuperuser && (
+                <TabsContent value="users" className="m-0 space-y-8">
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-lg font-medium">Usuários</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Gerencie os usuários do sistema.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <h4 className="font-medium">Criar novo usuário</h4>
+                      <form onSubmit={handleCreateUser} className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
+                        <div>
+                          <Label htmlFor="first-name">Nome</Label>
+                          <Input id="first-name" value={newUserFirstName} onChange={(e) => setNewUserFirstName(e.target.value)} />
+                        </div>
+                        <div>
+                          <Label htmlFor="last-name">Sobrenome</Label>
+                          <Input id="last-name" value={newUserLastName} onChange={(e) => setNewUserLastName(e.target.value)} />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <Label htmlFor="new-email">Email</Label>
+                          <Input id="new-email" type="email" value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)} />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <Label htmlFor="new-password">Senha</Label>
+                          <Input id="new-password-admin" type="password" value={newUserPassword} onChange={(e) => setNewUserPassword(e.target.value)} />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <Button type="submit" disabled={!newUserEmail || !newUserPassword}>Criar usuário</Button>
+                        </div>
+                      </form>
+                    </div>
+                    
+                    <div className="h-px bg-border" />
+                    
+                    <div className="space-y-2">
+                      <h4 className="font-medium">Todos os usuários</h4>
+                      <div className="border rounded-md overflow-hidden">
+                        <div className="grid grid-cols-4 gap-2 px-3 py-2 bg-muted text-sm font-medium">
+                          <div>Nome</div>
+                          <div>Email</div>
+                          <div>Usuário</div>
+                          <div>Superuser</div>
+                        </div>
+                        <div className="max-h-64 overflow-y-auto divide-y">
+                          {loadingUsers ? (
+                            <div className="px-3 py-2 text-sm text-muted-foreground">Carregando...</div>
+                          ) : users.length === 0 ? (
+                            <div className="px-3 py-2 text-sm text-muted-foreground">Nenhum usuário encontrado.</div>
+                          ) : (
+                            users.map(u => (
+                              <div key={u.id} className="grid grid-cols-4 gap-2 px-3 py-2 text-sm">
+                                <div>{`${u.first_name} ${u.last_name}`.trim() || u.username}</div>
+                                <div>{u.email}</div>
+                                <div>{u.username}</div>
+                                <div>{u.is_superuser ? 'Sim' : 'Não'}</div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
+              )}
             </div>
           </Tabs>
         </div>

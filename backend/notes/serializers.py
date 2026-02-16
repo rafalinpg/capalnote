@@ -12,6 +12,22 @@ class UserSerializer(serializers.ModelSerializer):
     def get_name(self, obj):
         return obj.get_full_name() or obj.username
 
+class UserAdminSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=True)
+    name = serializers.SerializerMethodField(read_only=True)
+    
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'name', 'is_superuser', 'is_staff', 'password', 'date_joined']
+        read_only_fields = ['id', 'is_superuser', 'is_staff', 'date_joined', 'name']
+    
+    def create(self, validated_data):
+        password = validated_data.pop('password')
+        user = User(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user
+
 class NoteMemberSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     
