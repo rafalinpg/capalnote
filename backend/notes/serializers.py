@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
+from django.db.models import Q
 from .models import Notebook, Note, Tag, Attachment, NoteMember, NotebookMember, ShareInvitation
 
 class UserSerializer(serializers.ModelSerializer):
@@ -15,11 +16,12 @@ class UserSerializer(serializers.ModelSerializer):
 class UserAdminSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)
     name = serializers.SerializerMethodField(read_only=True)
+    can_delete = serializers.SerializerMethodField(read_only=True)
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'name', 'is_superuser', 'is_staff', 'password', 'date_joined']
-        read_only_fields = ['id', 'is_superuser', 'is_staff', 'date_joined', 'name']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'name', 'is_superuser', 'is_staff', 'password', 'date_joined', 'can_delete']
+        read_only_fields = ['id', 'is_superuser', 'is_staff', 'date_joined', 'name', 'can_delete']
     
     def create(self, validated_data):
         password = validated_data.pop('password')
@@ -27,6 +29,12 @@ class UserAdminSerializer(serializers.ModelSerializer):
         user.set_password(password)
         user.save()
         return user
+
+    def get_name(self, obj):
+        return obj.get_full_name() or obj.username
+
+    def get_can_delete(self, obj):
+        return not Note.objects.filter(Q(author=obj) | Q(last_edited_by=obj)).exists()
 
 class NoteMemberSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)

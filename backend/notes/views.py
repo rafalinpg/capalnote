@@ -454,6 +454,18 @@ class UsersViewSet(viewsets.ModelViewSet):
         user = serializer.save()
         out = self.get_serializer(user)
         return Response(out.data, status=status.HTTP_201_CREATED)
+
+    def destroy(self, request, *args, **kwargs):
+        user = self.get_object()
+        if user == request.user:
+            return Response({'error': 'Você não pode excluir o próprio usuário.'}, status=status.HTTP_400_BAD_REQUEST)
+        has_notes = Note.objects.filter(Q(author=user) | Q(last_edited_by=user)).exists()
+        if has_notes:
+            return Response(
+                {'error': 'Usuário possui notas criadas ou editadas e não pode ser excluído.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return super().destroy(request, *args, **kwargs)
             
         # Prevent changing own role via this endpoint if needed, but UI should handle.
         # Ideally, owner cannot be changed here (owner is on Note/Notebook model, not Member).

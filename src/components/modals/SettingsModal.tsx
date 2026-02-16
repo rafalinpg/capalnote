@@ -38,12 +38,16 @@ export function SettingsModal({ open, onOpenChange, user, onUpdateUser }: Settin
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  const [users, setUsers] = useState<Array<{id:number; username:string; email:string; first_name:string; last_name:string; is_superuser:boolean}>>([]);
+  const [users, setUsers] = useState<Array<{id:number; username:string; email:string; first_name:string; last_name:string; is_superuser:boolean; can_delete?:boolean}>>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserFirstName, setNewUserFirstName] = useState('');
   const [newUserLastName, setNewUserLastName] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
+  const [editingUser, setEditingUser] = useState<{id:number; username:string; email:string; first_name:string; last_name:string; is_superuser:boolean; can_delete?:boolean} | null>(null);
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
 
   useEffect(() => {
     if (open && user) {
@@ -229,6 +233,66 @@ export function SettingsModal({ open, onOpenChange, user, onUpdateUser }: Settin
     }
   };
 
+  const openEditUser = (userData: {id:number; username:string; email:string; first_name:string; last_name:string; is_superuser:boolean; can_delete?:boolean}) => {
+    setEditingUser(userData);
+    setEditFirstName(userData.first_name || '');
+    setEditLastName(userData.last_name || '');
+    setEditEmail(userData.email || '');
+  };
+
+  const handleUpdateUserAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/users/${editingUser.id}/`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          first_name: editFirstName,
+          last_name: editLastName,
+          email: editEmail,
+          username: editEmail || editingUser.username,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || data.error || 'Falha ao atualizar usuário');
+      }
+      toast({ title: 'Usuário atualizado', description: 'Os dados do usuário foram salvos.' });
+      setEditingUser(null);
+      fetchUsers();
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteUser = async (userId: number) => {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/users/${userId}/`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (res.status === 204) {
+        toast({ title: 'Usuário excluído', description: 'O usuário foi removido com sucesso.' });
+        fetchUsers();
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || data.detail || 'Falha ao excluir usuário');
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl h-[500px] flex flex-col p-0 gap-0 overflow-hidden">
@@ -396,24 +460,40 @@ export function SettingsModal({ open, onOpenChange, user, onUpdateUser }: Settin
                     <div className="space-y-2">
                       <h4 className="font-medium">Todos os usuários</h4>
                       <div className="border rounded-md overflow-hidden">
-                        <div className="grid grid-cols-4 gap-2 px-3 py-2 bg-muted text-sm font-medium">
+                        <div className="grid grid-cols-[2fr_1fr_1.2fr] gap-2 px-3 py-2 bg-muted text-xs sm:text-sm font-medium">
                           <div>Nome</div>
-                          <div>Email</div>
-                          <div>Usuário</div>
-                          <div>Superuser</div>
+                          <div>Tipo</div>
+                          <div>Ações</div>
                         </div>
-                        <div className="max-h-64 overflow-y-auto divide-y">
+                        <div className="max-h-64 overflow-y-auto divide-y text-xs sm:text-sm">
                           {loadingUsers ? (
-                            <div className="px-3 py-2 text-sm text-muted-foreground">Carregando...</div>
+                            <div className="px-3 py-2 text-muted-foreground">Carregando...</div>
                           ) : users.length === 0 ? (
-                            <div className="px-3 py-2 text-sm text-muted-foreground">Nenhum usuário encontrado.</div>
+                            <div className="px-3 py-2 text-muted-foreground">Nenhum usuário encontrado.</div>
                           ) : (
                             users.map(u => (
-                              <div key={u.id} className="grid grid-cols-4 gap-2 px-3 py-2 text-sm">
-                                <div>{`${u.first_name} ${u.last_name}`.trim() || u.username}</div>
-                                <div>{u.email}</div>
-                                <div>{u.username}</div>
-                                <div>{u.is_superuser ? 'Sim' : 'Não'}</div>
+                              <div key={u.id} className="grid grid-cols-[2fr_1fr_1.2fr] gap-2 px-3 py-2 items-center">
+                                <div className="truncate">{`${u.first_name} ${u.last_name}`.trim() || u.username}</div>
+                                <div>{u.is_superuser ? 'Superusuário' : 'Usuário'}</div>
+                                <div className="flex gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openEditUser(u)}
+                                  >
+                                    Editar
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={!u.can_delete || String(u.id) === currentUser?.id}
+                                    onClick={() => handleDeleteUser(u.id)}
+                                  >
+                                    Excluir
+                                  </Button>
+                                </div>
                               </div>
                             ))
                           )}
@@ -426,6 +506,56 @@ export function SettingsModal({ open, onOpenChange, user, onUpdateUser }: Settin
             </div>
           </Tabs>
         </div>
+        {editingUser && (
+          <Dialog open={!!editingUser} onOpenChange={(isOpen) => !isOpen && setEditingUser(null)}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Editar usuário</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleUpdateUserAdmin} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="edit-first-name">Nome</Label>
+                    <Input
+                      id="edit-first-name"
+                      value={editFirstName}
+                      onChange={(e) => setEditFirstName(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-last-name">Sobrenome</Label>
+                    <Input
+                      id="edit-last-name"
+                      value={editLastName}
+                      onChange={(e) => setEditLastName(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="edit-email">Email</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setEditingUser(null)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button type="submit">
+                    Salvar
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </DialogContent>
     </Dialog>
   );
