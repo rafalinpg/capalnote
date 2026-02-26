@@ -437,35 +437,6 @@ class ShareViewSet(viewsets.ViewSet):
                 return Response({'error': 'Mismatch target'}, status=400)
         else:
             return Response({'error': 'Invalid target type'}, status=400)
-
-class UsersViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.all().order_by('username')
-    serializer_class = UserAdminSerializer
-    permission_classes = [permissions.IsAuthenticated, IsSuperUser]
-    
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
-    
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        out = self.get_serializer(user)
-        return Response(out.data, status=status.HTTP_201_CREATED)
-
-    def destroy(self, request, *args, **kwargs):
-        user = self.get_object()
-        if user == request.user:
-            return Response({'error': 'Você não pode excluir o próprio usuário.'}, status=status.HTTP_400_BAD_REQUEST)
-        has_notes = Note.objects.filter(Q(author=user) | Q(last_edited_by=user)).exists()
-        if has_notes:
-            return Response(
-                {'error': 'Usuário possui notas criadas ou editadas e não pode ser excluído.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        return super().destroy(request, *args, **kwargs)
             
         # Prevent changing own role via this endpoint if needed, but UI should handle.
         # Ideally, owner cannot be changed here (owner is on Note/Notebook model, not Member).
@@ -538,3 +509,32 @@ class UsersViewSet(viewsets.ModelViewSet):
                     if nb_member and nb_member.role == 'full_access':
                         can_share = True
         return can_share
+
+class UsersViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all().order_by('username')
+    serializer_class = UserAdminSerializer
+    permission_classes = [permissions.IsAuthenticated, IsSuperUser]
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        out = self.get_serializer(user)
+        return Response(out.data, status=status.HTTP_201_CREATED)
+
+    def destroy(self, request, *args, **kwargs):
+        user = self.get_object()
+        if user == request.user:
+            return Response({'error': 'Você não pode excluir o próprio usuário.'}, status=status.HTTP_400_BAD_REQUEST)
+        has_notes = Note.objects.filter(Q(author=user) | Q(last_edited_by=user)).exists()
+        if has_notes:
+            return Response(
+                {'error': 'Usuário possui notas criadas ou editadas e não pode ser excluído.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return super().destroy(request, *args, **kwargs)
