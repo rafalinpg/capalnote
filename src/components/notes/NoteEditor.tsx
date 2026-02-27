@@ -153,6 +153,11 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
       }),
       LinkExtension.configure({
         openOnClick: true,
+        autolink: true,
+        linkOnPaste: true,
+        HTMLAttributes: {
+          class: 'text-primary underline cursor-pointer',
+        },
       }),
       Placeholder.configure({
         placeholder: 'Comece a escrever sua nota...',
