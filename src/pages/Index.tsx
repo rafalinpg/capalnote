@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, PanelLeftClose, PanelLeft } from 'lucide-react';
+import { Plus, PanelLeftClose, PanelLeft, Menu } from 'lucide-react';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { NoteList } from '@/components/notes/NoteList';
 import { NoteEditor } from '@/components/notes/NoteEditor';
@@ -30,6 +30,7 @@ interface IndexProps {
 
 export default function Index({ user, onLogout }: IndexProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<NavSection>('recent');
   const [selectedNotebookId, setSelectedNotebookId] = useState<string>();
   const [selectedTagId, setSelectedTagId] = useState<string>();
@@ -428,29 +429,42 @@ export default function Index({ user, onLogout }: IndexProps) {
 
   return (
     <div className="h-screen flex bg-background overflow-hidden">
+      {/* Mobile Sidebar Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <AppSidebar
-        activeSection={activeSection}
-        onSectionChange={setActiveSection}
-        selectedNotebookId={selectedNotebookId}
-        onNotebookSelect={setSelectedNotebookId}
-        selectedTagId={selectedTagId}
-        onTagSelect={setSelectedTagId}
-        user={user}
-        onLogout={onLogout}
-        onOpenSearch={() => setIsSearchOpen(true)}
-        onOpenSettings={() => setIsSettingsModalOpen(true)}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        notebooks={notebooks}
-        onCreateNotebook={createNotebook}
-        onUpdateNotebook={updateNotebook}
-        onDeleteNotebook={handleDeleteNotebook}
-        tags={tags}
-        onCreateTag={createTag}
-        onUpdateTag={updateTag}
-        onDeleteTag={handleDeleteTag}
-      />
+      <div className={cn(
+        "fixed inset-y-0 left-0 z-50 w-[280px] md:relative md:w-auto md:z-auto transition-transform duration-300 ease-in-out md:translate-x-0 bg-background md:bg-transparent shadow-lg md:shadow-none border-r md:border-none",
+        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
+        <AppSidebar
+          activeSection={activeSection}
+          onSectionChange={(s) => { setActiveSection(s); setIsMobileMenuOpen(false); }}
+          selectedNotebookId={selectedNotebookId}
+          onNotebookSelect={(id) => { setSelectedNotebookId(id); setIsMobileMenuOpen(false); }}
+          selectedTagId={selectedTagId}
+          onTagSelect={(id) => { setSelectedTagId(id); setIsMobileMenuOpen(false); }}
+          user={user}
+          onLogout={onLogout}
+          onOpenSearch={() => { setIsSearchOpen(true); setIsMobileMenuOpen(false); }}
+          onOpenSettings={() => { setIsSettingsModalOpen(true); setIsMobileMenuOpen(false); }}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          notebooks={notebooks}
+          onCreateNotebook={createNotebook}
+          onUpdateNotebook={updateNotebook}
+          onDeleteNotebook={handleDeleteNotebook}
+          tags={tags}
+          onCreateTag={createTag}
+          onUpdateTag={updateTag}
+          onDeleteTag={handleDeleteTag}
+        />
+      </div>
 
       {/* Main Content */}
       <div className="flex-1 flex min-w-0">
@@ -458,13 +472,22 @@ export default function Index({ user, onLogout }: IndexProps) {
         <div
           className={cn(
             'border-r border-border transition-all duration-300',
-            (selectedNote || activeSection === 'files') ? 'w-[360px]' : 'w-full max-w-2xl'
+            (selectedNote || (activeSection === 'files' && selectedFile)) ? 'hidden md:block' : 'block w-full',
+            (selectedNote || activeSection === 'files') ? 'md:w-[360px]' : 'md:w-full md:max-w-2xl'
           )}
         >
           <div className="h-full flex flex-col">
             {/* Top Bar */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background/50 backdrop-blur">
               <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden -ml-2 text-muted-foreground"
+                  onClick={() => setIsMobileMenuOpen(true)}
+                >
+                  <Menu className="w-5 h-5" />
+                </Button>
               </div>
 
               <Button className="gap-2 shadow-soft" onClick={handleCreateNote}>
@@ -529,7 +552,7 @@ export default function Index({ user, onLogout }: IndexProps) {
                  />
                </motion.div>
              ) : (
-               <div className="flex-1 min-w-0 flex items-center justify-center text-muted-foreground">
+               <div className="hidden md:flex flex-1 min-w-0 items-center justify-center text-muted-foreground">
                  Selecione um arquivo para visualizar
                </div>
              )
@@ -564,7 +587,7 @@ export default function Index({ user, onLogout }: IndexProps) {
               />
             </motion.div>
           ) : (
-            <div className="flex-1 min-w-0">
+            <div className="hidden md:block flex-1 min-w-0">
               <EmptyState onCreateNote={handleCreateNote} />
             </div>
           )}

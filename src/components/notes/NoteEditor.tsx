@@ -463,28 +463,29 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
       </div>
 
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-muted-foreground px-3 py-2">
-            <span className="w-2 h-2 rounded-full bg-primary" />
-            <span className="text-sm font-medium">{notebook?.name || 'Sem caderno'}</span>
+      <div className="flex items-center justify-between px-4 py-3 md:px-6 md:py-4 border-b border-border gap-4">
+        <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+          <div className="flex items-center gap-2 text-muted-foreground px-2 py-1 md:px-3 md:py-2 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
+            <span className="text-sm font-medium truncate max-w-[100px] md:max-w-none">{notebook?.name || 'Sem caderno'}</span>
           </div>
 
-          <span className="text-muted-foreground">•</span>
+          <span className="hidden md:inline text-muted-foreground">•</span>
 
-          <span className="text-sm text-muted-foreground">
+          <span className="text-xs md:text-sm text-muted-foreground truncate">
             Editado {formatDistanceToNow(note.updatedAt, { addSuffix: true, locale: ptBR })}
-            {note.lastEditedBy && ` por ${note.lastEditedBy}`}
+            {note.lastEditedBy && <span className="hidden md:inline"> por {note.lastEditedBy}</span>}
           </span>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           <Button
             variant="ghost"
             size="icon"
             onClick={togglePin}
             title={isPinned ? 'Desafixar nota' : 'Fixar nota'}
             disabled={!canEdit}
+            className="hidden md:inline-flex"
           >
             <Pin className={cn("w-4 h-4", isPinned && "fill-primary text-primary")} />
           </Button>
@@ -525,7 +526,7 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Separator orientation="vertical" className="h-6 mx-2" />
+          <Separator orientation="vertical" className="h-6 mx-2 hidden md:block" />
 
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="w-4 h-4" />
