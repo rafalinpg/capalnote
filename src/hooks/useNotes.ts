@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Note, Tag, Attachment } from '../types';
 import { useAuth } from './useAuth';
-import { API_URL } from '@/lib/api';
+import { API_URL, getMediaUrl, processHtmlMediaUrls } from '@/lib/api';
 
 interface TagBackend {
   id: number;
@@ -48,7 +48,7 @@ const mapAttachmentToFrontend = (data: AttachmentBackend): Attachment => ({
   id: String(data.id),
   noteId: String(data.note),
   type: data.type as 'image' | 'audio' | 'file' | 'sketch',
-  fileUrl: data.file,
+  fileUrl: getMediaUrl(data.file),
   fileName: data.file_name,
   sizeBytes: data.size_bytes,
   mimeType: data.mime_type,
@@ -59,7 +59,7 @@ const mapToFrontend = (data: NoteBackend): Note => ({
   id: String(data.id),
   notebookId: String(data.notebook),
   title: data.title,
-  contentRich: data.content_rich,
+  contentRich: processHtmlMediaUrls(data.content_rich),
   contentText: data.content_text,
   isPinned: data.is_pinned,
   isArchived: data.is_archived,
