@@ -186,6 +186,17 @@ class AttachmentViewSet(viewsets.ModelViewSet):
 class ShareViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
+    def _get_frontend_base_url(self, request):
+        base_url = os.environ.get("FRONTEND_URL")
+        if base_url:
+            return base_url.rstrip("/")
+
+        forwarded_proto = request.META.get("HTTP_X_FORWARDED_PROTO")
+        scheme = forwarded_proto or ("https" if request.is_secure() else "http")
+        host = request.META.get("HTTP_X_FORWARDED_HOST") or request.get_host()
+
+        return f"{scheme}://{host}"
+
     @action(detail=False, methods=['post'])
     def invite(self, request):
         email = request.data.get('email')
@@ -243,15 +254,8 @@ class ShareViewSet(viewsets.ViewSet):
             invited_by=request.user,
             expires_at=timezone.now() + timedelta(days=7)
         )
-        
-        # In production, use the actual domain
-        # In development, use localhost:8080
-        base_url = "http://localhost:8080"
-        if not settings.DEBUG:
-            # Try to get from request header or settings
-            host = request.get_host()
-            base_url = f"http://{host}" # In prod this might need adjustment for frontend URL
-        
+
+        base_url = self._get_frontend_base_url(request)
         invite_link = f"{base_url}/register?token={token}"
         
         # Send email
@@ -365,17 +369,7 @@ class ShareViewSet(viewsets.ViewSet):
         if not can_share:
             return Response({'error': 'Permission denied'}, status=403)
             
-        # Determine base URL for invite link
-        base_url = os.environ.get('FRONTEND_URL')
-        
-        if not base_url:
-            if not settings.DEBUG:
-                host = request.get_host()
-                # Force HTTPS in production
-                base_url = f"https://{host}"
-            else:
-                base_url = "http://localhost:8080"
-        
+        base_url = self._get_frontend_base_url(request)
         invite_link = f"{base_url}/register?token={invitation.token}"
         
         try:
