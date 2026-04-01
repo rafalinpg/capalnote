@@ -41,6 +41,15 @@ class Note(models.Model):
         return self.title
 
 
+class NotePin(models.Model):
+    note = models.ForeignKey(Note, on_delete=models.CASCADE, related_name="pins")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="pinned_notes")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("note", "user")
+
+
 class Attachment(models.Model):
     TYPE_CHOICES = (
         ("image", "image"),

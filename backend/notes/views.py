@@ -11,7 +11,7 @@ from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
 import os
-from .models import Notebook, Note, Tag, Attachment, NoteMember, NotebookMember, ShareInvitation
+from .models import Notebook, Note, NotePin, Tag, Attachment, NoteMember, NotebookMember, ShareInvitation
 from .serializers import (
     NotebookSerializer, NoteSerializer, TagSerializer, AttachmentSerializer, 
     NoteMemberSerializer, NotebookMemberSerializer, ShareInvitationSerializer, UserAdminSerializer
@@ -120,13 +120,20 @@ class NoteViewSet(viewsets.ModelViewSet):
         user = self.request.user
         print(f"DEBUG: User={user.username}, Super={user.is_superuser}, Note={note.id}")
         
-        # Check if only is_pinned is being updated (to avoid updating updated_at)
-        # However, we still need to check permissions for pinning!
-        
-        # Determine user role
-        role = 'viewer' # Default
+        is_pinned_update = serializer.validated_data.pop("is_pinned", None) if "is_pinned" in serializer.validated_data else None
+
+        if is_pinned_update is not None:
+            if is_pinned_update:
+                NotePin.objects.get_or_create(note=note, user=user)
+            else:
+                NotePin.objects.filter(note=note, user=user).delete()
+
+        if len(serializer.validated_data) == 0:
+            return
+
+        role = "viewer"
         if note.author == user or note.notebook.owner == user or user.is_superuser:
-            role = 'owner'
+            role = "owner"
         else:
             member = note.members.filter(user=user).first()
             if member:
@@ -135,20 +142,11 @@ class NoteViewSet(viewsets.ModelViewSet):
                 nb_member = note.notebook.members.filter(user=user).first()
                 if nb_member:
                     role = nb_member.role
-        
-        if role not in ['owner', 'full_access', 'editor']:
-             raise PermissionDenied("You do not have permission to edit this note.")
 
-        if len(serializer.validated_data) == 1 and 'is_pinned' in serializer.validated_data:
-            # Bypass auto_now=True by using update() directly
-            # We don't update last_edited_by for pin operations either
-            Note.objects.filter(pk=serializer.instance.pk).update(
-                is_pinned=serializer.validated_data['is_pinned']
-            )
-            # Update instance manually so response reflects change
-            serializer.instance.is_pinned = serializer.validated_data['is_pinned']
-        else:
-            note = serializer.save(last_edited_by=self.request.user)
+        if role not in ["owner", "full_access", "editor"]:
+            raise PermissionDenied("You do not have permission to edit this note.")
+
+        serializer.save(last_edited_by=self.request.user)
 
             
     def perform_destroy(self, instance):

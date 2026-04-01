@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.db.models import Q
-from .models import Notebook, Note, Tag, Attachment, NoteMember, NotebookMember, ShareInvitation
+from .models import Notebook, Note, NotePin, Tag, Attachment, NoteMember, NotebookMember, ShareInvitation
 
 class UserSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
@@ -88,6 +88,17 @@ class NoteSerializer(serializers.ModelSerializer):
             'attachments', 'user_role',
             'created_at', 'updated_at'
         ]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            data["is_pinned"] = False
+            return data
+
+        data["is_pinned"] = NotePin.objects.filter(note=instance, user=user).exists()
+        return data
 
     def get_user_role(self, obj):
         user = self.context['request'].user
