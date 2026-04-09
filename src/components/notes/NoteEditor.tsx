@@ -141,6 +141,8 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
   const handleSaveRef = useRef<() => void>(() => {});
 
   const notebook = notebooks.find((n) => n.id === selectedNotebookId);
+  const sourceNotebook = notebooks.find((n) => n.id === note.notebookId);
+  const canMoveFromSource = (sourceNotebook?.userRole === 'owner' || sourceNotebook?.userRole === 'full_access') && !note.isTrashed;
 
   const editor = useEditor({
     editable: canEdit,
@@ -465,10 +467,83 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 md:px-6 md:py-4 border-b border-border gap-4">
         <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
-          <div className="flex items-center gap-2 text-muted-foreground px-2 py-1 md:px-3 md:py-2 shrink-0">
-            <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
-            <span className="text-sm font-medium truncate max-w-[100px] md:max-w-none">{notebook?.name || 'Sem caderno'}</span>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild disabled={!canEdit}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-auto px-2 py-1 md:px-3 md:py-2 gap-2 text-muted-foreground shrink-0"
+                onClick={(e) => {
+                  if (!canMoveFromSource) {
+                    e.preventDefault();
+                    toast({
+                      title: "Não permitido",
+                      description: "Você não tem permissão total na pasta atual para mover esta nota.",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+              >
+                <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
+                <span className="text-sm font-medium truncate max-w-[100px] md:max-w-none">
+                  {notebook?.name || 'Sem caderno'}
+                </span>
+                <ChevronDown className="w-3 h-3 shrink-0" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
+              {notebooks
+                .filter((n) => !n.isArchived)
+                .map((n) => {
+                  const isCurrent = n.id === note.notebookId;
+                  const canMoveToDestination = n.userRole === 'owner' || n.userRole === 'full_access';
+                  const disabled = isCurrent || !canMoveToDestination;
+
+                  return (
+                    <DropdownMenuItem
+                      key={n.id}
+                      disabled={disabled}
+                      onClick={async () => {
+                        if (!canMoveFromSource) {
+                          toast({
+                            title: "Não permitido",
+                            description: "Você não tem permissão total na pasta atual.",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+
+                        if (!canMoveToDestination) {
+                          toast({
+                            title: "Não permitido",
+                            description: "Você não tem permissão total na pasta de destino.",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+
+                        try {
+                          await onUpdate({ id: note.id, notebookId: n.id });
+                          setSelectedNotebookId(n.id);
+                          toast({
+                            title: "Nota movida",
+                            description: `Movida para "${n.name}".`,
+                          });
+                        } catch (error) {
+                          toast({
+                            title: "Erro ao mover",
+                            description: error instanceof Error ? error.message : "Não foi possível mover a nota.",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                    >
+                      <span className="truncate">{n.name}</span>
+                    </DropdownMenuItem>
+                  );
+                })}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <span className="hidden md:inline text-muted-foreground">•</span>
 

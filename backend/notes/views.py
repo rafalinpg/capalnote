@@ -131,6 +131,22 @@ class NoteViewSet(viewsets.ModelViewSet):
         if len(serializer.validated_data) == 0:
             return
 
+        new_notebook = serializer.validated_data.get("notebook")
+        if new_notebook and new_notebook.id != note.notebook_id:
+            def get_notebook_role(notebook):
+                if notebook.owner == user or user.is_superuser:
+                    return "owner"
+                member = notebook.members.filter(user=user).first()
+                return member.role if member else None
+
+            source_role = get_notebook_role(note.notebook)
+            if source_role not in ["owner", "full_access"]:
+                raise PermissionDenied("Você não tem permissão total na pasta atual.")
+
+            destination_role = get_notebook_role(new_notebook)
+            if destination_role not in ["owner", "full_access"]:
+                raise PermissionDenied("Você não tem permissão total na pasta de destino.")
+
         role = "viewer"
         if note.author == user or note.notebook.owner == user or user.is_superuser:
             role = "owner"
