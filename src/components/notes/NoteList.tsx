@@ -134,7 +134,7 @@ export function NoteList({ notes, selectedNoteId, onNoteSelect, onDelete, onRest
   );
 
   return (
-    <div className="h-full flex flex-col bg-background">
+    <div className="h-full min-h-0 flex flex-col bg-background">
       {/* Header */}
       <div className="p-6 border-b border-border">
         <div className="flex items-center justify-between gap-4">
@@ -172,7 +172,7 @@ export function NoteList({ notes, selectedNoteId, onNoteSelect, onDelete, onRest
       </div>
 
       {/* Notes */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4">
         {pinnedNotes.length > 0 && (
           <div className="mb-6">
             <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 px-2">

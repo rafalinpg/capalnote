@@ -58,7 +58,7 @@ export function FileList({ notes, selectedFileId, onFileSelect }: FileListProps)
   };
 
   return (
-    <div className="h-full flex flex-col bg-background">
+    <div className="h-full min-h-0 flex flex-col bg-background">
       <div className="p-4 border-b border-border space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-lg flex items-center gap-2">

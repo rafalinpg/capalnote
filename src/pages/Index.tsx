@@ -467,7 +467,7 @@ export default function Index({ user, onLogout }: IndexProps) {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex min-w-0">
+      <div className="flex-1 flex min-w-0 min-h-0">
         {/* Note List Panel */}
         <div
           className={cn(
@@ -476,7 +476,7 @@ export default function Index({ user, onLogout }: IndexProps) {
             (selectedNote || activeSection === 'files') ? 'md:w-[360px]' : 'md:w-full md:max-w-2xl'
           )}
         >
-          <div className="h-full flex flex-col">
+          <div className="h-full min-h-0 flex flex-col">
             {/* Top Bar */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background/50 backdrop-blur">
               <div className="flex items-center gap-2">
