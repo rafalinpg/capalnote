@@ -9,6 +9,11 @@ export function useTags() {
   const [error, setError] = useState<string | null>(null);
   const { token } = useAuth();
 
+  const forceLogout = () => {
+    sessionStorage.setItem("auth_reason", "expired");
+    window.dispatchEvent(new Event('capalnote:logout'));
+  };
+
   const fetchTags = useCallback(async () => {
     if (!token) return;
     setLoading(true);
@@ -20,6 +25,11 @@ export function useTags() {
           'Content-Type': 'application/json',
         },
       });
+
+      if (response.status === 401) {
+        forceLogout();
+        throw new Error('Sessão expirada. Faça login novamente.');
+      }
 
       if (!response.ok) {
         throw new Error('Falha ao carregar etiquetas');
@@ -51,6 +61,11 @@ export function useTags() {
       body: JSON.stringify({ name, color }),
     });
 
+    if (response.status === 401) {
+      forceLogout();
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
+
     if (!response.ok) {
       throw new Error('Falha ao criar etiqueta');
     }
@@ -73,6 +88,11 @@ export function useTags() {
       body: JSON.stringify(data),
     });
 
+    if (response.status === 401) {
+      forceLogout();
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
+
     if (!response.ok) {
       throw new Error('Falha ao atualizar etiqueta');
     }
@@ -93,6 +113,11 @@ export function useTags() {
         'Content-Type': 'application/json',
       },
     });
+
+    if (response.status === 401) {
+      forceLogout();
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
 
     if (!response.ok) {
       throw new Error('Falha ao excluir etiqueta');

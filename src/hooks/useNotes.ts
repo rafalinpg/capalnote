@@ -80,6 +80,11 @@ export function useNotes() {
   const [error, setError] = useState<string | null>(null);
   const { token } = useAuth();
 
+  const forceLogout = () => {
+    sessionStorage.setItem("auth_reason", "expired");
+    window.dispatchEvent(new Event('capalnote:logout'));
+  };
+
   const fetchNotes = useCallback(async () => {
     if (!token) return;
     setLoading(true);
@@ -91,6 +96,11 @@ export function useNotes() {
           'Content-Type': 'application/json',
         },
       });
+
+      if (response.status === 401) {
+        forceLogout();
+        throw new Error('Sessão expirada. Faça login novamente.');
+      }
 
       if (!response.ok) {
         throw new Error('Falha ao carregar notas');
@@ -121,6 +131,11 @@ export function useNotes() {
         content_text: contentText,
       }),
     });
+
+    if (response.status === 401) {
+      forceLogout();
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -199,6 +214,11 @@ export function useNotes() {
       body: JSON.stringify(backendData),
     });
 
+    if (response.status === 401) {
+      forceLogout();
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Update note error response:', response.status, errorText);
@@ -225,6 +245,11 @@ export function useNotes() {
       },
     });
 
+    if (response.status === 401) {
+      forceLogout();
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
+
     if (!response.ok) {
       throw new Error('Falha ao excluir nota permanentemente');
     }
@@ -244,6 +269,11 @@ export function useNotes() {
         'Authorization': `Bearer ${token}`,
       },
     });
+
+    if (response.status === 401) {
+      forceLogout();
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
 
     if (!response.ok) {
       throw new Error('Falha ao esvaziar lixeira');
@@ -267,6 +297,11 @@ export function useNotes() {
       },
       body: formData,
     });
+
+    if (response.status === 401) {
+      forceLogout();
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
 
     if (!response.ok) {
       throw new Error('Falha ao enviar anexo');
@@ -297,6 +332,11 @@ export function useNotes() {
           'Authorization': `Bearer ${token}`,
         },
       });
+
+      if (response.status === 401) {
+        forceLogout();
+        throw new Error('Sessão expirada. Faça login novamente.');
+      }
 
       if (!response.ok) {
         throw new Error('Falha ao excluir anexo');

@@ -33,6 +33,11 @@ export function useNotebooks() {
   const [error, setError] = useState<string | null>(null);
   const { token } = useAuth();
 
+  const forceLogout = () => {
+    sessionStorage.setItem("auth_reason", "expired");
+    window.dispatchEvent(new Event('capalnote:logout'));
+  };
+
   const fetchNotebooks = useCallback(async () => {
     if (!token) return;
     setLoading(true);
@@ -44,6 +49,11 @@ export function useNotebooks() {
           'Content-Type': 'application/json',
         },
       });
+
+      if (response.status === 401) {
+        forceLogout();
+        throw new Error('Sessão expirada. Faça login novamente.');
+      }
 
       if (!response.ok) {
         throw new Error('Falha ao carregar cadernos');
@@ -69,6 +79,11 @@ export function useNotebooks() {
       },
       body: JSON.stringify({ name, description }),
     });
+
+    if (response.status === 401) {
+      forceLogout();
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
 
     if (!response.ok) {
       throw new Error('Falha ao criar caderno');
@@ -98,6 +113,11 @@ export function useNotebooks() {
       body: JSON.stringify(backendData),
     });
 
+    if (response.status === 401) {
+      forceLogout();
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
+
     if (!response.ok) {
       throw new Error('Falha ao atualizar caderno');
     }
@@ -118,6 +138,11 @@ export function useNotebooks() {
         'Content-Type': 'application/json',
       },
     });
+
+    if (response.status === 401) {
+      forceLogout();
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
 
     if (!response.ok) {
       throw new Error('Falha ao excluir caderno');

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { User } from '@/types';
 import { API_URL } from '@/lib/api';
 
@@ -7,12 +7,30 @@ export const useAuth = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [token, setToken] = useState<string | null>(localStorage.getItem('access_token'));
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null);
     setToken(null);
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
-  };
+  }, []);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'access_token' && !e.newValue) {
+        logout();
+      }
+    };
+
+    const onForcedLogout = () => logout();
+
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('capalnote:logout', onForcedLogout as EventListener);
+
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('capalnote:logout', onForcedLogout as EventListener);
+    };
+  }, [logout]);
 
   const fetchUser = async (authToken: string) => {
     try {

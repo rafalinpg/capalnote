@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FileText, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -17,10 +17,27 @@ const Login = ({ onLogin }: LoginProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
   
   const inviteToken = searchParams.get('token');
+
+  useEffect(() => {
+    const stateReason = (location.state as { reason?: string } | null)?.reason;
+    const storedReason = sessionStorage.getItem("auth_reason");
+    const reason = stateReason || storedReason;
+
+    if (reason === "expired") {
+      toast({
+        title: "Sessão expirada",
+        description: "Faça login novamente para continuar.",
+        variant: "destructive",
+      });
+      sessionStorage.removeItem("auth_reason");
+      navigate(location.pathname + location.search, { replace: true, state: null });
+    }
+  }, [location.pathname, location.search, location.state, navigate, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
