@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, PanelLeftClose, PanelLeft, Menu } from 'lucide-react';
+import { Plus, Menu } from 'lucide-react';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { NoteList } from '@/components/notes/NoteList';
 import { NoteEditor } from '@/components/notes/NoteEditor';
@@ -29,7 +29,6 @@ interface IndexProps {
 }
 
 export default function Index({ user, onLogout }: IndexProps) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<NavSection>('recent');
   const [selectedNotebookId, setSelectedNotebookId] = useState<string>();
@@ -40,6 +39,20 @@ export default function Index({ user, onLogout }: IndexProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const mainContentRef = useRef<HTMLDivElement | null>(null);
+  const [isMdUp, setIsMdUp] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.matchMedia('(min-width: 768px)').matches;
+  });
+  const NOTE_LIST_WIDTH_STORAGE_KEY = 'capalnote:noteListWidth';
+  const [noteListWidth, setNoteListWidth] = useState(() => {
+    if (typeof window === 'undefined') return 360;
+    const stored = window.localStorage.getItem(NOTE_LIST_WIDTH_STORAGE_KEY);
+    const parsed = stored ? Number(stored) : NaN;
+    return Number.isFinite(parsed) ? parsed : 360;
+  });
+  const noteListWidthRef = useRef(noteListWidth);
+  const [isResizing, setIsResizing] = useState(false);
 
   const [confirmationModal, setConfirmationModal] = useState<{
     isOpen: boolean;
@@ -135,6 +148,35 @@ export default function Index({ user, onLogout }: IndexProps) {
     return () => document.removeEventListener('keydown', down);
   }, []);
 
+  useEffect(() => {
+    noteListWidthRef.current = noteListWidth;
+  }, [noteListWidth]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(min-width: 768px)');
+    const onChange = (e: MediaQueryListEvent) => setIsMdUp(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  const clampNoteListWidth = useCallback((value: number) => {
+    if (typeof window === 'undefined') return value;
+    const containerWidth = mainContentRef.current?.getBoundingClientRect().width ?? window.innerWidth;
+    const minWidth = 280;
+    const minEditorWidth = 360;
+    const resizerWidth = 4;
+    const maxWidth = Math.max(minWidth, containerWidth - minEditorWidth - resizerWidth);
+    return Math.min(Math.max(value, minWidth), maxWidth);
+  }, []);
+
+  useEffect(() => {
+    if (!isMdUp) return;
+    const onResize = () => setNoteListWidth((w) => clampNoteListWidth(w));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [clampNoteListWidth, isMdUp]);
+
   // Filter notes based on active section and search query
   const filteredNotes = useMemo(() => {
     let result: Note[];
@@ -225,6 +267,40 @@ export default function Index({ user, onLogout }: IndexProps) {
     }
     return undefined;
   }, [selectedFileId, notes]);
+
+  const isSplitView = Boolean(selectedNote) || (activeSection === 'files' && Boolean(selectedFile));
+  const showResizer = isMdUp && isSplitView;
+
+  const handleStartResize = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!showResizer) return;
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = noteListWidthRef.current;
+
+    setIsResizing(true);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMove = (ev: PointerEvent) => {
+      const next = clampNoteListWidth(startWidth + (ev.clientX - startX));
+      noteListWidthRef.current = next;
+      setNoteListWidth(next);
+    };
+
+    const onEnd = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onEnd);
+      window.removeEventListener('pointercancel', onEnd);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      setIsResizing(false);
+      window.localStorage.setItem(NOTE_LIST_WIDTH_STORAGE_KEY, String(noteListWidthRef.current));
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onEnd);
+    window.addEventListener('pointercancel', onEnd);
+  }, [NOTE_LIST_WIDTH_STORAGE_KEY, clampNoteListWidth, showResizer]);
 
   const handleOpenNote = (noteId: string) => {
      setSelectedNoteId(noteId);
@@ -467,14 +543,17 @@ export default function Index({ user, onLogout }: IndexProps) {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex min-w-0 min-h-0">
+      <div ref={mainContentRef} className="flex-1 flex min-w-0 min-h-0">
         {/* Note List Panel */}
         <div
           className={cn(
-            'border-r border-border transition-all duration-300',
-            (selectedNote || (activeSection === 'files' && selectedFile)) ? 'hidden md:block' : 'block w-full',
-            (selectedNote || activeSection === 'files') ? 'md:w-[360px]' : 'md:w-full md:max-w-2xl'
+            'transition-all duration-300',
+            showResizer ? 'md:flex-none border-r-0' : 'border-r border-border',
+            isResizing && 'transition-none',
+            isSplitView ? 'hidden md:block' : 'block w-full',
+            isSplitView ? '' : 'md:w-full md:max-w-2xl'
           )}
+          style={showResizer ? { width: noteListWidth } : undefined}
         >
           <div className="h-full min-h-0 flex flex-col">
             {/* Top Bar */}
@@ -534,6 +613,19 @@ export default function Index({ user, onLogout }: IndexProps) {
             )}
           </div>
         </div>
+
+        {showResizer && (
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Ajustar largura da nota"
+            onPointerDown={handleStartResize}
+            className={cn(
+              'hidden md:block w-1 flex-none cursor-col-resize bg-border/40 hover:bg-border',
+              isResizing && 'bg-border'
+            )}
+          />
+        )}
 
         {/* Note Editor Panel */}
         <AnimatePresence mode="wait">
