@@ -122,6 +122,21 @@ interface NoteEditorProps {
   onShare: () => void;
 }
 
+const buildUniqueImageFile = (file: File) => {
+  const extensionFromType = file.type.split('/')[1] || 'png';
+  const originalExtension = file.name.includes('.') ? file.name.split('.').pop() : '';
+  const extension = (originalExtension || extensionFromType).replace(/[^a-zA-Z0-9]/g, '') || 'png';
+  const uniqueId =
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+  return new File([file], `clipboard-${uniqueId}.${extension}`, {
+    type: file.type || `image/${extensionFromType}`,
+    lastModified: file.lastModified || Date.now(),
+  });
+};
+
 export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete, onUploadAttachment, onDeleteAttachment, onShare }: NoteEditorProps) {
   const [title, setTitle] = useState(note.title);
   const [isPinned, setIsPinned] = useState(note.isPinned);
@@ -143,6 +158,16 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
   const notebook = notebooks.find((n) => n.id === selectedNotebookId);
   const sourceNotebook = notebooks.find((n) => n.id === note.notebookId);
   const canMoveFromSource = (sourceNotebook?.userRole === 'owner' || sourceNotebook?.userRole === 'full_access') && !note.isTrashed;
+
+  const insertUploadedImage = useCallback(async (view: Parameters<NonNullable<NonNullable<ReturnType<typeof useEditor>>['options']['editorProps']>['handlePaste']>[0], file: File) => {
+    const uploadFile = file.name.toLowerCase() === 'image.png' ? buildUniqueImageFile(file) : file;
+    const attachment = await onUploadAttachment(uploadFile, 'image');
+    const { schema } = view.state;
+    const node = schema.nodes.image.create({ src: attachment.fileUrl });
+    const transaction = view.state.tr.replaceSelectionWith(node);
+    view.dispatch(transaction);
+    setLocalAttachments(prev => [...prev, attachment]);
+  }, [onUploadAttachment]);
 
   const editor = useEditor({
     editable: canEdit,
@@ -178,13 +203,7 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
         if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0]) {
           const file = event.dataTransfer.files[0];
           if (file.type.startsWith('image/')) {
-            onUploadAttachment(file, 'image').then(attachment => {
-              const { schema } = view.state;
-              const node = schema.nodes.image.create({ src: attachment.fileUrl });
-              const transaction = view.state.tr.replaceSelectionWith(node);
-              view.dispatch(transaction);
-              setLocalAttachments(prev => [...prev, attachment]);
-            }).catch(error => {
+            insertUploadedImage(view, file).catch(error => {
               console.error('Failed to upload image:', error);
               alert('Erro ao enviar imagem');
             });
@@ -200,13 +219,7 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
             if (item.type.startsWith('image/')) {
               const file = item.getAsFile();
               if (file) {
-                onUploadAttachment(file, 'image').then(attachment => {
-                  const { schema } = view.state;
-                  const node = schema.nodes.image.create({ src: attachment.fileUrl });
-                  const transaction = view.state.tr.replaceSelectionWith(node);
-                  view.dispatch(transaction);
-                  setLocalAttachments(prev => [...prev, attachment]);
-                }).catch(error => {
+                insertUploadedImage(view, file).catch(error => {
                   console.error('Failed to upload image:', error);
                   alert('Erro ao enviar imagem');
                 });
@@ -221,7 +234,7 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
     onUpdate: ({ editor }) => {
       // Auto-save logic handled by useEffect
     },
-  });
+  }, [canEdit, insertUploadedImage]);
 
   const isFirstRender = useRef(true);
 

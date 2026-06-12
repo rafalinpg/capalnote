@@ -44,11 +44,16 @@ const mapTagToFrontend = (data: TagBackend): Tag => ({
   color: data.color,
 });
 
+const withAttachmentVersion = (url: string, data: AttachmentBackend) => {
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}attachment=${data.id}&ts=${encodeURIComponent(data.created_at)}`;
+};
+
 const mapAttachmentToFrontend = (data: AttachmentBackend): Attachment => ({
   id: String(data.id),
   noteId: String(data.note),
   type: data.type as 'image' | 'audio' | 'file' | 'sketch',
-  fileUrl: getMediaUrl(data.file),
+  fileUrl: withAttachmentVersion(getMediaUrl(data.file), data),
   fileName: data.file_name,
   sizeBytes: data.size_bytes,
   mimeType: data.mime_type,

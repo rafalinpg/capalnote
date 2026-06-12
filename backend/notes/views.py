@@ -11,6 +11,8 @@ from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
 import os
+from pathlib import Path
+from uuid import uuid4
 from .models import Notebook, Note, NotePin, Tag, Attachment, NoteMember, NotebookMember, ShareInvitation
 from .serializers import (
     NotebookSerializer, NoteSerializer, TagSerializer, AttachmentSerializer, 
@@ -179,6 +181,10 @@ class AttachmentViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)
 
+    def _build_unique_file_name(self, original_name):
+        suffix = Path(original_name or "").suffix.lower()
+        return f"{uuid4().hex}{suffix}"
+
     def get_queryset(self):
         user = self.request.user
         if user.is_superuser:
@@ -195,6 +201,8 @@ class AttachmentViewSet(viewsets.ModelViewSet):
         file_name = file.name if file else ''
         size_bytes = file.size if file else 0
         mime_type = file.content_type if file else ''
+        if file:
+            file.name = self._build_unique_file_name(file_name)
         serializer.save(file_name=file_name, size_bytes=size_bytes, mime_type=mime_type)
 
 class ShareViewSet(viewsets.ViewSet):
