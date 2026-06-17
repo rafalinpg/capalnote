@@ -8,6 +8,7 @@ import LinkExtension from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import FontFamily from '@tiptap/extension-font-family';
 import CharacterCount from '@tiptap/extension-character-count';
+import type { EditorView } from '@tiptap/pm/view';
 import { TextStyle } from '@tiptap/extension-text-style';
 import {
   Bold,
@@ -154,20 +155,25 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const handleSaveRef = useRef<() => void>(() => {});
+  const onUploadAttachmentRef = useRef(onUploadAttachment);
 
   const notebook = notebooks.find((n) => n.id === selectedNotebookId);
   const sourceNotebook = notebooks.find((n) => n.id === note.notebookId);
   const canMoveFromSource = (sourceNotebook?.userRole === 'owner' || sourceNotebook?.userRole === 'full_access') && !note.isTrashed;
 
-  const insertUploadedImage = useCallback(async (view: Parameters<NonNullable<NonNullable<ReturnType<typeof useEditor>>['options']['editorProps']>['handlePaste']>[0], file: File) => {
+  useEffect(() => {
+    onUploadAttachmentRef.current = onUploadAttachment;
+  }, [onUploadAttachment]);
+
+  const insertUploadedImage = useCallback(async (view: EditorView, file: File) => {
     const uploadFile = file.name.toLowerCase() === 'image.png' ? buildUniqueImageFile(file) : file;
-    const attachment = await onUploadAttachment(uploadFile, 'image');
+    const attachment = await onUploadAttachmentRef.current(uploadFile, 'image');
     const { schema } = view.state;
     const node = schema.nodes.image.create({ src: attachment.fileUrl });
     const transaction = view.state.tr.replaceSelectionWith(node);
     view.dispatch(transaction);
     setLocalAttachments(prev => [...prev, attachment]);
-  }, [onUploadAttachment]);
+  }, []);
 
   const editor = useEditor({
     editable: canEdit,
@@ -234,7 +240,7 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
     onUpdate: ({ editor }) => {
       // Auto-save logic handled by useEffect
     },
-  }, [canEdit, insertUploadedImage]);
+  }, [canEdit]);
 
   const isFirstRender = useRef(true);
 
@@ -413,9 +419,7 @@ export function NoteEditor({ note, notebooks, tags, onClose, onUpdate, onDelete,
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file && editor) {
         try {
-          const attachment = await onUploadAttachment(file, 'image');
-          editor.chain().focus().setImage({ src: attachment.fileUrl }).run();
-          setLocalAttachments(prev => [...prev, attachment]);
+          await insertUploadedImage(editor.view, file);
         } catch (error) {
           console.error('Failed to upload image:', error);
           alert('Erro ao enviar imagem');
