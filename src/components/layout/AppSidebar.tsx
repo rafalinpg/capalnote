@@ -121,7 +121,7 @@ export function AppSidebar({
             'shadow-soft'
           )}
         >
-          <NotebookIcon className="w-5 h-5 text-primary-foreground" />
+          <FileText className="w-5 h-5 text-primary-foreground" />
         </div>
         <AnimatePresence>
           <motion.div
@@ -131,7 +131,7 @@ export function AppSidebar({
             className="flex-1 overflow-hidden"
           >
             <h1 className="font-semibold text-foreground truncate">CapalNote</h1>
-            <p className="text-xs text-muted-foreground truncate">Notas Corporativas</p>
+            <p className="text-xs text-muted-foreground truncate"> Gerenciamento de Notas</p>
           </motion.div>
         </AnimatePresence>
       </div>

@@ -200,16 +200,16 @@ const Login = ({ onLogin }: LoginProps) => {
                   className="mx-auto mb-16 w-full max-w-[240px] object-contain sm:max-w-[270px]"
                 />
                 <div
-                  className="mb-3 text-[28px] font-bold uppercase tracking-[0.01em] sm:text-[40px]"
+                  className="mb-3 text-[28px] font-bold tracking-[0.01em] sm:text-[40px]"
                   style={{ color: formColors.title }}
                 >
-                  SGN
+                  CapalNote
                 </div>
                 <h1
                   className="max-w-[430px] text-[1.9rem] font-bold leading-[1.02] sm:text-[2.5rem]"
                   style={{ color: brandTheme.hero.heading }}
                 >
-                  Sistema Gerenciador de Notas
+                  Gerenciamento de Notas
                 </h1>
               </div>
             </div>
@@ -302,7 +302,7 @@ const Login = ({ onLogin }: LoginProps) => {
               </form>
 
               <p className="mt-[18px] text-[0.8rem] leading-[1.45]" style={{ color: brandTheme.card.text }}>
-                Caso nao saiba o seu usuario, entre em contato com Rafael Weckerlin.
+                Caso não saiba o seu usuário, entre em contato com Rafael Weckerlin.
               </p>
             </div>
           </div>
